@@ -1,11 +1,38 @@
 import numpy as np
-import pandas as pd
 
-# Example input: PCI values for n roads in 2019 and 2021
-pci_2019 = [4, 3, 4, 3, 5, 4, 4, 4, 4, 5, 2, 3, 3, 2, 5, 1, 4, 3, 5, 5, 2, 2, 3, 3, 5, 3, 3, 3, 5, 5, 3, 4, 4, 2, 4, 2, 4,
-            4, 3, 2, 2, 3, 2, 3, 2, 1, 3, 4, 3, 5, 3, 2, 2, 4, 4, 2, 2, 4, 3, 4, 2, 3, 3, 4, 2, 4, 4, 3, 2, 5]
-pci_2021 = [4, 3, 3, 3, 5, 3, 4, 4, 3, 4, 1, 2, 2, 1, 4, 1, 3, 3, 5, 4, 1, 2, 3, 3, 5, 3, 3, 2, 4, 4, 3, 4, 4, 2, 3, 2, 4,
-            4, 3, 2, 1, 3, 1, 2, 2, 1, 3, 3, 3, 4, 2, 1, 2, 4, 4, 2, 2, 3, 3, 3, 2, 2, 3, 4, 2, 3, 4, 3, 2, 5]
+# Function to get user input for PCI values
+
+
+def get_pci_values(year):
+    print(
+        f"Enter PCI values for {year} (one value per line, press Enter twice to finish):")
+    pci_list = []
+    while True:
+        line = input().strip()
+        if line == "":
+            break  # Stop reading input when an empty line is entered
+        try:
+            pci_value = int(line)
+            if 1 <= pci_value <= 5:
+                pci_list.append(pci_value)
+            else:
+                print(
+                    f"Invalid PCI value: {pci_value}. Please enter a value between 1 and 5.")
+        except ValueError:
+            print(f"Invalid input: {line}. Please enter an integer.")
+    return pci_list
+
+
+# Get PCI values from the user
+print("Enter PCI values for 2019:")
+pci_2019 = get_pci_values("2019")
+print("\nEnter PCI values for 2021:")
+pci_2021 = get_pci_values("2021")
+
+# Ensure both lists have the same length
+if len(pci_2019) != len(pci_2021):
+    print("Error: The number of PCI values for 2019 and 2021 must be the same.")
+    exit()
 
 # Number of PCI states (from 1 to 5)
 num_states = 5
