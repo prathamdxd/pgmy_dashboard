@@ -1,0 +1,1076 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Development of Prediction Model of Rural Roads</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --primary: #1e2328;
+        --primary-dark: #2a2e34;
+        --secondary: #3b3f46;
+        --accent: #f5b301;
+        --accent-light: #fed053;
+        --gray: #52575d;
+        --light: #f8f9fa;
+        --dark: #212529;
+        --white: #ffffff;
+        --card-shadow: 0 4px 6px rgba(0, 0, 0, 0.05),
+          0 1px 3px rgba(0, 0, 0, 0.1);
+        --transition: all 0.3s ease;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Inter", sans-serif;
+        background-color: #f5f7fb;
+        background-image: url("img1.jpg");
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        background-attachment: fixed;
+        color: var(--dark);
+        line-height: 1.6;
+        padding: 0;
+        margin: 0;
+      }
+
+      .container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 0 2rem;
+      }
+
+      @media (min-width: 768px) {
+        .container {
+          padding: 0 10rem;
+        }
+      }
+
+      header {
+        background: linear-gradient(
+          135deg,
+          var(--primary),
+          var(--primary-dark)
+        );
+        color: white;
+        padding: 4rem 0;
+        margin-bottom: 2rem;
+        border-radius: 0 0 12px 12px;
+        box-shadow: var(--card-shadow);
+      }
+
+      .header-content {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 0 2rem;
+      }
+
+      h1 {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+      }
+
+      h2 {
+        font-size: 2rem;
+        font-weight: 600;
+        margin-bottom: 1.5rem;
+        color: var(--primary);
+      }
+
+      h3 {
+        font-size: 1.4rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        color: var(--primary);
+      }
+
+      h4 {
+        font-size: 2rem;
+        font-weight: 500;
+        margin-bottom: 0.75rem;
+        color: var(--gray);
+      }
+
+      .card {
+        background-color: rgba(231, 231, 231, 0.8);
+        border-radius: 12px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        box-shadow: var(--card-shadow);
+        transition: var(--transition);
+        border: 1px solid #eaeaea;
+      }
+
+      @media (min-width: 768px) {
+        .card {
+          padding: 3rem;
+        }
+      }
+
+      .card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1),
+          0 4px 6px rgba(0, 0, 0, 0.05);
+      }
+
+      .form-group {
+        margin-bottom: 1rem;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-weight: 500;
+        color: var(--primary);
+        font-size: 1.1rem;
+      }
+
+      input,
+      select,
+      textarea {
+        padding: 0.5rem 0.75rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        transition: var(--transition);
+        background-color: var(--white);
+        /* width: 100%; */
+      }
+
+      input:focus,
+      select:focus,
+      textarea:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(245, 179, 1, 0.2);
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.5rem 1.25rem;
+        border-radius: 6px;
+        font-size: 1.1rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: var(--transition);
+        border: none;
+        text-decoration: none;
+        color: white;
+        margin-bottom: 15px;
+        width: 100%;
+      }
+
+      @media (min-width: 768px) {
+        .btn {
+          width: auto;
+        }
+      }
+
+      .btn-primary {
+        background-color: var(--primary);
+        color: var(--white);
+      }
+
+      .btn-primary:hover {
+        background-color: var(--primary-dark);
+        transform: translateY(-1px);
+      }
+
+      .btn-accent {
+        background-color: var(--primary);
+        color: var(--white);
+      }
+
+      .btn-accent:hover {
+        background-color: var(--accent);
+        transform: translateY(-1px);
+        color: var(--dark);
+      }
+
+      .btn-group {
+        display: flex;
+        gap: 0.75rem;
+        margin-top: 1rem;
+        flex-direction: column;
+      }
+
+      @media (min-width: 768px) {
+        .btn-group {
+          flex-direction: row;
+        }
+      }
+
+      .road-form {
+        background-color: var(--light);
+        border-radius: 8px;
+        padding: 1.5rem 3.5rem;
+        margin-bottom: 1.25rem;
+        border-left: 4px solid var(--accent);
+      }
+
+      table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        margin: 1.5rem 0;
+        background-color: var(--white);
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: var(--card-shadow);
+        font-size: 0.9rem;
+      }
+
+      th,
+      td {
+        padding: 0.75rem;
+        text-align: left;
+        border-bottom: 1px solid #e2e8f0;
+      }
+
+      th {
+        background-color: #ffbf5c;
+        font-weight: 600;
+        color: var(--primary);
+        text-transform: uppercase;
+        font-size: 0.8rem;
+        letter-spacing: 0.5px;
+      }
+
+      tr:hover td {
+        background-color: #f8fafc;
+      }
+
+      .chart-container {
+        background-color: var(--white);
+        border-radius: 12px;
+        padding: 1rem;
+        margin-bottom: 2rem;
+        box-shadow: var(--card-shadow);
+        height: 400px;
+        border: 1px solid #eaeaea;
+      }
+
+      .pci-scale {
+        margin: 2rem 0;
+      }
+
+      .very-good {
+        background-color: #2ecc71;
+        color: white;
+      }
+
+      .good {
+        background-color: #27ae60;
+        color: white;
+      }
+
+      .fair {
+        background-color: #f39c12;
+        color: white;
+      }
+
+      .poor {
+        background-color: #e74c3c;
+        color: white;
+      }
+
+      .very-poor {
+        background-color: #c0392b;
+        color: white;
+      }
+
+      .failed {
+        background-color: #7f8c8d;
+        color: white;
+      }
+
+      .badge {
+        display: inline-block;
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        line-height: 1;
+        text-align: center;
+        white-space: nowrap;
+        vertical-align: baseline;
+        border-radius: 4px;
+      }
+
+      .badge-very-good {
+        background-color: #2ecc71;
+        color: white;
+      }
+
+      .badge-good {
+        background-color: #27ae60;
+        color: white;
+      }
+
+      .badge-fair {
+        background-color: #f39c12;
+        color: white;
+      }
+
+      .badge-poor {
+        background-color: #e74c3c;
+        color: white;
+      }
+
+      .badge-very-poor {
+        background-color: #c0392b;
+        color: white;
+      }
+
+      .badge-failed {
+        background-color: #7f8c8d;
+        color: white;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+      }
+
+      @media (min-width: 992px) {
+        .grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+
+      .hidden {
+        display: none;
+      }
+
+      .logo {
+        font-weight: 700;
+        font-size: 1.25rem;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .logo-icon {
+        width: 50px;
+        height: 28px;
+        background-color: var(--accent);
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--primary);
+        font-weight: 800;
+      }
+
+      .spinner {
+        display: inline-block;
+        width: 1rem;
+        height: 1rem;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top-color: white;
+        animation: spin 1s ease-in-out infinite;
+        margin-right: 8px;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+      }
+
+      .loading-content {
+        background-color: white;
+        padding: 2rem;
+        border-radius: 8px;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="header-content">
+        <div class="logo">
+          <div class="logo-icon">RPM</div>
+          <span>Rural Roads Prediction Model</span>
+        </div>
+        <h1>
+          Development of Prediction Model of
+          <span style="color: var(--accent)">Rural Roads</span>
+        </h1>
+        <p>Advanced predictive analytics for rural road maintenance planning</p>
+      </div>
+    </header>
+
+    <div class="container">
+      <div class="card">
+        <h2>Enter Road Details</h2>
+        <div class="form-group">
+          <label for="numRoads">Number of roads to analyze:</label>
+          <input
+            type="number"
+            id="numRoads"
+            min="1"
+            value="1"
+            aria-label="Number of roads to analyze"
+          />
+        </div>
+
+        <div class="btn-group">
+          <button
+            class="btn btn-accent"
+            onclick="createRoadForms()"
+            aria-label="Create forms"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              fill="currentColor"
+              viewBox="0 0 16 16"
+              style="margin-right: 8px"
+              aria-hidden="true"
+            >
+              <path
+                d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"
+              />
+            </svg>
+            Create Forms
+          </button>
+        </div>
+
+        <div id="roadFormsContainer"></div>
+
+        <button
+          id="analyzeBtn"
+          class="btn btn-primary hidden"
+          onclick="analyzeRoads()"
+          aria-label="Analyze roads"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            fill="currentColor"
+            viewBox="0 0 16 16"
+            style="margin-right: 8px"
+            aria-hidden="true"
+          >
+            <path
+              d="M11.534 7h3.932a.25.25 0 0 1 .192.41l-1.966 2.36a.25.25 0 0 1-.384 0l-1.966-2.36a.25.25 0 0 1 .192-.41zm-11 2h3.932a.25.25 0 0 0 .192-.41L2.692 6.23a.25.25 0 0 0-.384 0L.342 8.59A.25.25 0 0 0 .534 9z"
+            />
+            <path
+              fill-rule="evenodd"
+              d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 1 1-.771-.636A6.002 6.002 0 0 1 13.917 7H12.9A5.002 5.002 0 0 0 8 3zM3.1 9a5.002 5.002 0 0 0 8.757 2.182.5.5 0 1 1 .771.636A6.002 6.002 0 0 1 2.083 9H3.1z"
+            />
+          </svg>
+          Analyze Roads
+        </button>
+      </div>
+
+      <div id="resultsSection" class="hidden" aria-live="polite">
+        <div class="card">
+          <h2>Analysis Results</h2>
+
+          <div id="resultsTable"></div>
+
+          <div class="btn-group">
+            <button
+              id="downloadBtn"
+              class="btn btn-accent"
+              onclick="downloadCSV()"
+              aria-label="Download results as CSV"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                fill="currentColor"
+                viewBox="0 0 16 16"
+                style="margin-right: 8px"
+                aria-hidden="true"
+              >
+                <path
+                  d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"
+                />
+                <path
+                  d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"
+                />
+              </svg>
+              Download Results as CSV
+            </button>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="card">
+            <h3>Line Chart of PCI Values Over Years</h3>
+            <div class="chart-container">
+              <canvas
+                id="pciLineChart"
+                aria-label="Line chart showing PCI values over years"
+              ></canvas>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Bar Chart of PCI Values by Road</h3>
+            <div class="chart-container">
+              <canvas
+                id="pciBarChart"
+                aria-label="Bar chart showing PCI values by road"
+              ></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="card pci-scale">
+          <h3>PCI Condition Classification</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>PCI Range</th>
+                <th>Condition</th>
+                <th>Recommended Treatment</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="very-good">
+                <td>85-100</td>
+                <td><span class="badge badge-very-good">Very Good</span></td>
+                <td>Preventive maintenance only</td>
+              </tr>
+              <tr class="good">
+                <td>65-85</td>
+                <td><span class="badge badge-good">Good</span></td>
+                <td>Minor rehabilitation</td>
+              </tr>
+              <tr class="fair">
+                <td>50-65</td>
+                <td><span class="badge badge-fair">Fair</span></td>
+                <td>Moderate rehabilitation</td>
+              </tr>
+              <tr class="poor">
+                <td>25-50</td>
+                <td><span class="badge badge-poor">Poor</span></td>
+                <td>Major rehabilitation</td>
+              </tr>
+              <tr class="very-poor">
+                <td>10-25</td>
+                <td><span class="badge badge-very-poor">Very Poor</span></td>
+                <td>Reconstruction needed</td>
+              </tr>
+              <tr class="failed">
+                <td>0-10</td>
+                <td>
+                  <span class="badge badge-failed">Failed Condition</span>
+                </td>
+                <td>Immediate reconstruction</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let roads = [];
+      let pciLineChart = null;
+      let pciBarChart = null;
+
+      // Dataset mapping based on the provided CSV
+      const pciDataset = {
+        // Key format: "PCI_2019-PCI_2021"
+        "4-4": {
+          2023: 56.32,
+          2025: 42.58,
+          2027: 31.08,
+          2029: 22.84,
+          2031: 17.49,
+        },
+        "3-3": {
+          2023: 40.74,
+          2025: 28.94,
+          2027: 21.03,
+          2029: 16.2,
+          2031: 13.4,
+        },
+        "4-3": {
+          2023: 40.74,
+          2025: 28.94,
+          2027: 21.03,
+          2029: 16.2,
+          2031: 13.4,
+        },
+        "5-5": {
+          2023: 68.35,
+          2025: 54.04,
+          2027: 40.73,
+          2029: 29.91,
+          2031: 22.18,
+        },
+        "5-4": {
+          2023: 56.32,
+          2025: 42.58,
+          2027: 31.08,
+          2029: 22.84,
+          2031: 17.49,
+        },
+        "2-1": { 2023: 10.0, 2025: 10.0, 2027: 10.0, 2029: 10.0, 2031: 10.0 },
+        "3-2": {
+          2023: 18.37,
+          2025: 13.51,
+          2027: 11.47,
+          2029: 10.61,
+          2031: 10.26,
+        },
+        "1-1": { 2023: 10.0, 2025: 10.0, 2027: 10.0, 2029: 10.0, 2031: 10.0 },
+        "2-2": {
+          2023: 18.37,
+          2025: 13.51,
+          2027: 11.47,
+          2029: 10.61,
+          2031: 10.26,
+        },
+      };
+
+      function createRoadForms() {
+        const numRoads = parseInt(document.getElementById("numRoads").value);
+        if (isNaN(numRoads) || numRoads < 1) {
+          alert("Please enter a valid number of roads (at least 1)");
+          return;
+        }
+
+        const container = document.getElementById("roadFormsContainer");
+        container.innerHTML = "";
+
+        for (let i = 0; i < numRoads; i++) {
+          const roadForm = document.createElement("div");
+          roadForm.className = "road-form";
+          roadForm.innerHTML = `
+            <h3>Road ${i + 1} Details</h3>
+            <div class="form-group">
+              <label for="roadName${i}">Road Name:</label>
+              <input type="text" id="roadName${i}" required aria-label="Road name for road ${
+            i + 1
+          }">
+            </div>
+            <div class="form-group">
+              <label for="pci2019_${i}">PCI value in 2019 (1-5):</label>
+              <input type="number" id="pci2019_${i}" min="1" max="5" required aria-label="PCI value in 2019 for road ${
+            i + 1
+          }">
+            </div>
+            <div class="form-group">
+              <label for="pci2021_${i}">PCI value in 2021 (1-5):</label>
+              <input type="number" id="pci2021_${i}" min="1" max="5" required aria-label="PCI value in 2021 for road ${
+            i + 1
+          }">
+            </div>
+          `;
+          container.appendChild(roadForm);
+        }
+
+        document.getElementById("analyzeBtn").classList.remove("hidden");
+      }
+
+      function showLoading() {
+        const overlay = document.createElement("div");
+        overlay.className = "loading-overlay";
+        overlay.innerHTML = `
+          <div class="loading-content">
+            <div class="spinner"></div>
+            <p>Analyzing road data...</p>
+          </div>
+        `;
+        document.body.appendChild(overlay);
+        return overlay;
+      }
+
+      function hideLoading(overlay) {
+        if (overlay && overlay.parentNode) {
+          overlay.parentNode.removeChild(overlay);
+        }
+      }
+
+      async function analyzeRoads() {
+        const numRoads = parseInt(document.getElementById("numRoads").value);
+        roads = [];
+
+        // Validate all inputs first
+        for (let i = 0; i < numRoads; i++) {
+          const roadName = document.getElementById(`roadName${i}`).value.trim();
+          const pci2019 = parseInt(
+            document.getElementById(`pci2019_${i}`).value
+          );
+          const pci2021 = parseInt(
+            document.getElementById(`pci2021_${i}`).value
+          );
+
+          if (!roadName || isNaN(pci2019)) {
+            alert(
+              `Please enter a valid road name and PCI 2019 value for Road ${
+                i + 1
+              }`
+            );
+            return;
+          }
+
+          if (isNaN(pci2021)) {
+            alert(`Please enter a valid PCI 2021 value for Road ${i + 1}`);
+            return;
+          }
+
+          if (pci2019 < 1 || pci2019 > 5 || pci2021 < 1 || pci2021 > 5) {
+            alert(`PCI values must be between 1 and 5 for Road ${i + 1}`);
+            return;
+          }
+
+          roads.push({
+            name: roadName,
+            pci_2019: pci2019,
+            pci_2021: pci2021,
+          });
+        }
+
+        const loadingOverlay = showLoading();
+
+        // Simulate processing time (remove in production)
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
+        const results = predictPCIs(roads);
+        displayResults(results);
+        document.getElementById("resultsSection").classList.remove("hidden");
+        hideLoading(loadingOverlay);
+
+        // Scroll to results
+        document
+          .getElementById("resultsSection")
+          .scrollIntoView({ behavior: "smooth" });
+      }
+
+      function predictPCIs(roads) {
+        const predictionYears = [2023, 2025, 2027, 2029, 2031];
+
+        return {
+          roads: roads.map((road) => {
+            const key = `${road.pci_2019}-${road.pci_2021}`;
+            const predictions =
+              pciDataset[key] || getDefaultPrediction(road.pci_2021);
+
+            return {
+              name: road.name,
+              pci_2021: road.pci_2021,
+              projections: Object.fromEntries(
+                predictionYears.map((year) => [
+                  year,
+                  {
+                    pci: predictions[year],
+                    condition: classifyPCI(predictions[year]),
+                  },
+                ])
+              ),
+            };
+          }),
+          years: predictionYears,
+        };
+      }
+
+      function getDefaultPrediction(currentPCI) {
+        // Default prediction if no exact match found
+        // Using a simple degradation model based on the dataset patterns
+        const baseValue = currentPCI * 15; // Base value scaled by PCI
+        return {
+          2023: baseValue,
+          2025: baseValue * 0.85,
+          2027: baseValue * 0.7,
+          2029: baseValue * 0.6,
+          2031: baseValue * 0.5,
+        };
+      }
+
+      function classifyPCI(value) {
+        if (value > 85) return "Very Good";
+        if (value > 65) return "Good";
+        if (value > 50) return "Fair";
+        if (value > 25) return "Poor";
+        if (value > 10) return "Very Poor";
+        return "Failed Condition";
+      }
+
+      function displayResults(results) {
+        let tableHTML = `
+          <table>
+            <thead>
+              <tr>
+                <th>Road Name</th>
+                <th>PCI 2021</th>
+                ${results.years.map((year) => `<th>PCI ${year}</th>`).join("")}
+              </tr>
+            </thead>
+            <tbody>
+        `;
+
+        const lineChartData = {
+          labels: ["2021", ...results.years],
+          datasets: [],
+        };
+
+        const barChartData = {
+          labels: results.roads.map((road) => road.name),
+          datasets: results.years.map((year) => {
+            return {
+              label: year,
+              data: results.roads.map((road) => road.projections[year].pci),
+              backgroundColor: getRandomColor(),
+            };
+          }),
+        };
+
+        results.roads.forEach((road) => {
+          tableHTML += `
+            <tr>
+              <td><strong>${road.name}</strong></td>
+              <td>${road.pci_2021}</td>
+              ${results.years
+                .map((year) => {
+                  const condition = road.projections[year].condition;
+                  const badgeClass = getBadgeClass(condition);
+                  return `<td>${road.projections[year].pci.toFixed(
+                    2
+                  )} <span class="badge ${badgeClass}">${condition}</span></td>`;
+                })
+                .join("")}
+            </tr>
+          `;
+
+          lineChartData.datasets.push({
+            label: road.name,
+            data: [
+              road.pci_2021 * 20,
+              ...results.years.map((year) => road.projections[year].pci),
+            ],
+            borderWidth: 2,
+            fill: false,
+            tension: 0.1,
+            backgroundColor: getRandomColor(),
+            borderColor: getRandomColor(),
+          });
+        });
+
+        tableHTML += `
+            </tbody>
+          </table>
+        `;
+
+        document.getElementById("resultsTable").innerHTML = tableHTML;
+
+        // Destroy previous charts if they exist
+        if (pciLineChart) {
+          pciLineChart.destroy();
+        }
+        if (pciBarChart) {
+          pciBarChart.destroy();
+        }
+
+        // Create new charts
+        const lineCtx = document
+          .getElementById("pciLineChart")
+          .getContext("2d");
+        const barCtx = document.getElementById("pciBarChart").getContext("2d");
+
+        pciLineChart = new Chart(lineCtx, {
+          type: "line",
+          data: lineChartData,
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              y: {
+                beginAtZero: false,
+                title: {
+                  display: true,
+                  text: "PCI Value",
+                },
+                min: 0,
+                max: 100,
+              },
+              x: {
+                title: {
+                  display: true,
+                  text: "Year",
+                },
+              },
+            },
+            plugins: {
+              title: {
+                display: true,
+                text: "Road PCI Projections Over Time",
+              },
+              tooltip: {
+                callbacks: {
+                  label: function (context) {
+                    const roadName = context.dataset.label;
+                    let year, condition;
+
+                    if (context.label === "2021") {
+                      year = 2021;
+                      condition = classifyPCI(context.parsed.y);
+                    } else {
+                      year = context.label;
+                      condition = results.roads.find((r) => r.name === roadName)
+                        .projections[year].condition;
+                    }
+                    return `${roadName}: ${context.parsed.y.toFixed(
+                      2
+                    )} (${condition})`;
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        pciBarChart = new Chart(barCtx, {
+          type: "bar",
+          data: barChartData,
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              y: {
+                beginAtZero: false,
+                title: {
+                  display: true,
+                  text: "PCI Value",
+                },
+                min: 0,
+                max: 100,
+              },
+              x: {
+                title: {
+                  display: true,
+                  text: "Road Name",
+                },
+              },
+            },
+            plugins: {
+              title: {
+                display: true,
+                text: "PCI Values by Road and Year",
+              },
+              tooltip: {
+                callbacks: {
+                  label: function (context) {
+                    const year = context.dataset.label;
+                    const roadName = barChartData.labels[context.dataIndex];
+                    const condition = results.roads.find(
+                      (r) => r.name === roadName
+                    ).projections[year].condition;
+                    return `${year}: ${context.parsed.y.toFixed(
+                      2
+                    )} (${condition})`;
+                  },
+                },
+              },
+            },
+          },
+        });
+      }
+
+      function getBadgeClass(condition) {
+        switch (condition) {
+          case "Very Good":
+            return "badge-very-good";
+          case "Good":
+            return "badge-good";
+          case "Fair":
+            return "badge-fair";
+          case "Poor":
+            return "badge-poor";
+          case "Very Poor":
+            return "badge-very-poor";
+          case "Failed Condition":
+            return "badge-failed";
+          default:
+            return "";
+        }
+      }
+
+      function getRandomColor() {
+        const colors = [
+          "#1E2328",
+          "#2A2E34",
+          "#3B3F46",
+          "#52575D",
+          "#F5B301",
+          "#FED053",
+          "#1E2328",
+          "#2A2E34",
+        ];
+        return colors[Math.floor(Math.random() * colors.length)];
+      }
+
+      function downloadCSV() {
+        const table = document.getElementById("resultsTable");
+        const rows = table.querySelectorAll("tr");
+        let csvContent = "data:text/csv;charset=utf-8,";
+
+        // Add headers
+        const headers = [];
+        rows[0].querySelectorAll("th").forEach((header) => {
+          headers.push(header.textContent);
+        });
+        csvContent += headers.join(",") + "\n";
+
+        // Add data rows
+        for (let i = 1; i < rows.length; i++) {
+          const row = [];
+          rows[i].querySelectorAll("td").forEach((cell) => {
+            // Remove the badge span content and just keep the numeric value
+            const text = cell.textContent.replace(/\s*\(.*?\)\s*/g, "").trim();
+            row.push(text);
+          });
+          csvContent += row.join(",") + "\n";
+        }
+
+        // Create download link
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "rural_roads_pci_analysis.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    </script>
+  </body>
+</html>
