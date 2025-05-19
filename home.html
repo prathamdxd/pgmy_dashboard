@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rural Roads Prediction Model - Home</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <!-- Add Font Awesome for icons -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <style>
+      :root {
+        /* Color Palette */
+        --primary: #1a1e23;
+        --primary-dark: #252a32;
+        --secondary: #2d343f;
+        --accent: #f5b301;
+        --accent-light: #fed053;
+        --text-light: #f8f9fa;
+        --text-dark: #212529;
+        --text-gray: #a0a8b0;
+        --card-bg: rgba(37, 42, 50, 0.95);
+        --card-border: #3b424e;
+        --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        --transition: all 0.3s ease;
+      }
+
+      /* Base Styles */
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Inter", sans-serif;
+        background-color: #0f1216;
+        background-image: url("img1.jpg");
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        background-attachment: fixed;
+        color: var(--text-light);
+        line-height: 1.6;
+      }
+
+      .container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 0 2rem;
+      }
+
+      @media (min-width: 768px) {
+        .container {
+          padding: 0 4rem;
+        }
+      }
+
+      /* Typography */
+      h1,
+      h2,
+      h3,
+      h4,
+      h5,
+      h6 {
+        font-weight: 700;
+        line-height: 1.2;
+        margin-bottom: 1rem;
+      }
+
+      h1 {
+        font-size: 2.5rem;
+        color: var(--text-light);
+      }
+
+      h2 {
+        font-size: 2rem;
+        color: var(--accent);
+      }
+
+      h3 {
+        font-size: 1.5rem;
+        color: var(--accent);
+      }
+
+      h4 {
+        font-size: 1.25rem;
+      }
+
+      p {
+        color: var(--text-light);
+        margin-bottom: 1.25rem;
+        font-size: 1.2rem;
+      }
+
+      /* Header */
+      header {
+        background: linear-gradient(
+          135deg,
+          var(--primary),
+          var(--primary-dark)
+        );
+        color: var(--text-light);
+        padding: 7rem 0 4rem;
+        margin-bottom: 2rem;
+        box-shadow: var(--card-shadow);
+      }
+
+      .header-content {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 0 2rem;
+      }
+
+      /* Navigation */
+      .navbar {
+        background: linear-gradient(
+          135deg,
+          var(--primary),
+          var(--primary-dark)
+        );
+        color: white;
+        padding: 1rem 2rem;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 100;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      }
+
+      .nav-logo {
+        font-weight: 700;
+        font-size: 1.2rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: white;
+        text-decoration: none;
+      }
+
+      .nav-logo-icon {
+        width: 50px;
+        height: 22px;
+        background-color: var(--accent);
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--primary);
+        font-weight: 700;
+      }
+
+      .nav-links {
+        display: flex;
+        gap: 1.5rem;
+      }
+
+      .nav-links a {
+        color: var(--text-light);
+        text-decoration: none;
+        font-weight: 500;
+        transition: var(--transition);
+        padding: 0.5rem 0;
+        position: relative;
+      }
+
+      .nav-links a:hover {
+        color: var(--accent);
+      }
+
+      .nav-links a::after {
+        content: "";
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 0;
+        height: 2px;
+        background-color: var(--accent);
+        transition: var(--transition);
+      }
+
+      .nav-links a:hover::after {
+        width: 100%;
+      }
+
+      .mobile-menu-btn {
+        display: none;
+        background: none;
+        border: none;
+        color: white;
+        font-size: 1.5rem;
+        cursor: pointer;
+      }
+
+      /* Sidebar */
+      .sidebar {
+        position: fixed;
+        top: 0;
+        right: -300px;
+        width: 280px;
+        height: 100%;
+        background: linear-gradient(
+          135deg,
+          var(--primary),
+          var(--primary-dark)
+        );
+        z-index: 1000;
+        transition: var(--transition);
+        padding: 2rem;
+        box-shadow: -5px 0 15px rgba(0, 0, 0, 0.2);
+      }
+
+      .sidebar.open {
+        right: 0;
+      }
+
+      .sidebar-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+      }
+
+      .sidebar-links {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      .sidebar-links a {
+        color: white;
+        text-decoration: none;
+        font-weight: 500;
+        padding: 0.75rem 1rem;
+        border-radius: 6px;
+        transition: var(--transition);
+      }
+
+      .sidebar-links a:hover {
+        color: var(--accent);
+        background-color: rgba(255, 255, 255, 0.1);
+      }
+
+      .close-sidebar {
+        background: none;
+        border: none;
+        color: white;
+        font-size: 1.5rem;
+        cursor: pointer;
+      }
+
+      .overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 999;
+        opacity: 0;
+        pointer-events: none;
+        transition: var(--transition);
+      }
+
+      .overlay.active {
+        opacity: 1;
+        pointer-events: all;
+      }
+
+      /* Cards */
+      .card {
+        background: var(--card-bg);
+        border-radius: 10px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        box-shadow: var(--card-shadow);
+        transition: var(--transition);
+        border: 1px solid var(--card-border);
+        backdrop-filter: blur(5px);
+      }
+
+      .card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+      }
+
+      .feature-list {
+        margin-left: 1.5rem;
+        margin-bottom: 1.5rem;
+      }
+
+      .feature-list li {
+        color: var(--text-light);
+        margin-bottom: 0.75rem;
+        position: relative;
+        padding-left: 1.5rem;
+        font-size: 1.1rem;
+      }
+
+      .feature-list li::before {
+        position: absolute;
+        left: 0;
+      }
+
+      /* Stats Cards */
+      .stats-container {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1.5rem;
+        margin-top: 1.5rem;
+      }
+
+      .stat-card {
+        background: linear-gradient(
+          135deg,
+          var(--primary),
+          var(--primary-dark)
+        );
+        border-radius: 8px;
+        padding: 1.5rem;
+        text-align: center;
+        box-shadow: var(--card-shadow);
+        border: 1px solid var(--card-border);
+        transition: var(--transition);
+      }
+
+      .stat-card:hover {
+        transform: translateY(-3px);
+      }
+
+      .stat-value {
+        font-size: 2.2rem;
+        font-weight: 700;
+        color: var(--accent);
+        margin-bottom: 0.5rem;
+      }
+
+      .stat-label {
+        font-size: 0.95rem;
+        color: var(--text-light);
+      }
+
+      /* Team Members */
+      .team-member {
+        display: flex;
+        align-items: center;
+        gap: 1.25rem;
+        margin-bottom: 1.5rem;
+      }
+
+      .team-avatar {
+        width: 70px;
+        height: 70px;
+        border-radius: 50%;
+        background-color: var(--secondary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--accent);
+        font-size: 2rem;
+        border: 3px solid var(--accent);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      }
+
+      .team-member h4 {
+        color: var(--text-light);
+        margin-bottom: 0.25rem;
+      }
+
+      .team-member p {
+        color: var(--text-gray);
+        font-size: 0.9rem;
+        margin-bottom: 0;
+      }
+
+      /* Buttons */
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.75rem 1.5rem;
+        border-radius: 6px;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: var(--transition);
+        border: none;
+        text-decoration: none;
+        color: white;
+      }
+
+      .btn-group {
+        display: flex;
+        gap: 1rem;
+        margin-top: 1.5rem;
+      }
+
+      .btn-primary {
+        background: linear-gradient(135deg, var(--accent), var(--accent-light));
+        color: var(--primary);
+      }
+
+      .btn-primary:hover {
+        background: linear-gradient(135deg, var(--accent-light), var(--accent));
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(245, 179, 1, 0.3);
+      }
+
+      .btn-accent {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid var(--accent);
+        color: var(--accent);
+      }
+
+      .btn-accent:hover {
+        background: rgba(245, 179, 1, 0.1);
+        transform: translateY(-2px);
+      }
+
+      /* Grid Layout */
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+      }
+
+      @media (min-width: 992px) {
+        .grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+
+      /* Responsive Adjustments */
+      @media (max-width: 768px) {
+        .nav-links {
+          display: none;
+        }
+
+        .mobile-menu-btn {
+          display: block;
+        }
+
+        .stats-container {
+          grid-template-columns: 1fr;
+        }
+
+        .container {
+          padding: 0 1.5rem;
+        }
+
+        header {
+          padding: 6rem 0 3rem;
+        }
+
+        h1 {
+          font-size: 2rem;
+        }
+
+        h2 {
+          font-size: 1.75rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+      <a href="index.html" class="nav-logo">
+        <div class="nav-logo-icon">RPM</div>
+        <span>Rural Roads</span>
+      </a>
+
+      <div class="nav-links">
+        <a href="#homepage">Home</a>
+        <a href="calculate-PCI.html">Calculate PCI</a>
+        <a href="calculate-budget.html">Calculate Budget</a>
+        <a href="contact-us.html">Contact Us</a>
+      </div>
+
+      <button class="mobile-menu-btn" id="mobileMenuBtn">☰</button>
+    </nav>
+
+    <!-- Mobile Sidebar -->
+    <div class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <a href="#homepage" class="nav-logo">
+          <div class="nav-logo-icon">RPM</div>
+          <span>Rural Roads</span>
+        </a>
+        <button class="close-sidebar" id="closeSidebar">×</button>
+      </div>
+
+      <div class="sidebar-links">
+        <a href="#homepage">Home</a>
+        <a href="calculate-PCI.html">Calculate PCI</a>
+        <a href="calculate-budget.html">Calculate Budget</a>
+        <a href="contact-us.html">Contact Us</a>
+      </div>
+    </div>
+
+    <div class="overlay" id="overlay"></div>
+
+    <header id="homepage">
+      <div class="header-content">
+        <h1>
+          Development of Prediction Model for
+          <span style="color: var(--accent)">PMGSY Roads</span>
+        </h1>
+        <p>
+          Advanced predictive analytics for rural road maintenance planning
+          using Markov Chain modeling
+        </p>
+      </div>
+    </header>
+
+    <div class="container">
+      <div class="card">
+        <h2>About Our Project</h2>
+        <p>
+          Our project focuses on developing a software tool for predicting the
+          condition of rural roads under the Pradhan Mantri Gram Sadak Yojana
+          (PMGSY) program. Using Markov Chain modeling, we've created a
+          predictive system that helps optimize road maintenance planning and
+          resource allocation.
+        </p>
+
+        <div class="stats-container">
+          <div class="stat-card">
+            <div class="stat-value">70</div>
+            <div class="stat-label">Road Sections Analyzed</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">279.3 km</div>
+            <div class="stat-label">Total Road Length</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">10</div>
+            <div class="stat-label">Year Prediction</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">96.22%</div>
+            <div class="stat-label">Accuracy</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="card">
+          <h3>Project Objectives</h3>
+          <ul class="feature-list">
+            <li>
+              Assess the condition of PMGSY roads in Shivamogga district through
+              visual surveys and PCI rating
+            </li>
+            <li>Predict future road conditions using Markov Chain modeling</li>
+            <li>Develop a decision support system for maintenance planning</li>
+            <li>Optimize resource allocation for rural road maintenance</li>
+            <li>Extend the serviceable life of rural road infrastructure</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h3>Key Features</h3>
+          <ul class="feature-list">
+            <li>Pavement Condition Index (PCI) assessment tool</li>
+            <li>Markov Chain-based deterioration prediction</li>
+            <li>10-year road condition forecasting</li>
+            <li>Visualization of road condition trends</li>
+            <li>Maintenance recommendation system</li>
+            <li>Budget estimation for rehabilitation</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Why This Project Matters</h2>
+        <p>
+          Rural road networks are critical for economic development and social
+          welfare in India. The PMGSY program has significantly improved rural
+          connectivity, but maintaining these roads efficiently is challenging
+          due to limited resources. Our predictive model helps:
+        </p>
+
+        <ul class="feature-list">
+          <li>Identify roads needing immediate attention</li>
+          <li>Plan maintenance activities proactively</li>
+          <li>Optimize limited maintenance budgets</li>
+          <li>Extend the lifespan of rural roads</li>
+          <li>Improve safety and ride quality</li>
+          <li>Support data-driven decision making</li>
+        </ul>
+
+        <p>
+          With our tool, decision-makers can implement the right treatment at
+          the right time, reducing long-term maintenance costs while maximizing
+          road performance.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2>Our Team</h2>
+        <div class="grid">
+          <div>
+            <div class="team-member">
+              <div class="team-avatar">
+                <i class="fas fa-user"></i>
+              </div>
+              <div>
+                <h4>Vaishnavi C R</h4>
+                <p>4JN22CV030</p>
+              </div>
+            </div>
+            <div class="team-member">
+              <div class="team-avatar">
+                <i class="fas fa-user"></i>
+              </div>
+              <div>
+                <h4>Usha S K</h4>
+                <p>4JN22CV029</p>
+              </div>
+            </div>
+            <div class="team-member">
+              <div class="team-avatar">
+                <i class="fas fa-user"></i>
+              </div>
+              <div>
+                <h4>Shriraksha</h4>
+                <p>4JN22CV024</p>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="team-member">
+              <div class="team-avatar">
+                <i class="fas fa-user"></i>
+              </div>
+              <div>
+                <h4>Prathamesh V</h4>
+                <p>4JN22CS114</p>
+                <p>Developer</p>
+              </div>
+            </div>
+            <div class="team-member">
+              <div class="team-avatar">
+                <i class="fas fa-user"></i>
+              </div>
+              <div>
+                <h4>Sinchana N</h4>
+                <p>4JN22CV025</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <h3 style="margin-top: 2rem">Under the guidance of</h3>
+        <div class="team-member">
+          <div class="team-avatar">
+            <i class="fas fa-user-tie"></i>
+          </div>
+          <div>
+            <h4>Dr. Arun V</h4>
+            <p>M.Tech, Ph.D</p>
+            <p>Assistant Professor, Dept. of Civil Engineering, JNNCE</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Get Started</h2>
+        <p>
+          Ready to analyze your rural roads? Use our tools to assess current
+          conditions and predict future performance.
+        </p>
+
+        <div class="btn-group">
+          <a href="index2.html" class="btn btn-primary">Calculate PCI</a>
+          <a href="calculate-budget.html" class="btn btn-accent"
+            >Estimate Budget</a
+          >
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Mobile menu functionality
+      const mobileMenuBtn = document.getElementById("mobileMenuBtn");
+      const sidebar = document.getElementById("sidebar");
+      const closeSidebar = document.getElementById("closeSidebar");
+      const overlay = document.getElementById("overlay");
+
+      mobileMenuBtn.addEventListener("click", () => {
+        sidebar.classList.add("open");
+        overlay.classList.add("active");
+      });
+
+      closeSidebar.addEventListener("click", () => {
+        sidebar.classList.remove("open");
+        overlay.classList.remove("active");
+      });
+
+      overlay.addEventListener("click", () => {
+        sidebar.classList.remove("open");
+        overlay.classList.remove("active");
+      });
+    </script>
+  </body>
+</html>
