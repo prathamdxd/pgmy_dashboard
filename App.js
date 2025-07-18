@@ -16,50 +16,22 @@ import { createStackNavigator } from "@react-navigation/stack";
 import { NavigationContainer } from "@react-navigation/native";
 
 import CalculatePCIScreen from "./CalculatePCIScreen";
+import ContactScreen from "./ContactScreen";
+
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 // FAQ Screen Component
 const FAQScreen = ({ navigation }) => {
   const faqData = [
     {
-      question: "What is this app about?",
-      answer:
-        "This app helps predict the condition of rural roads under the PMGSY program using Markov Chain modeling to optimize maintenance planning and resource allocation.",
-    },
-    {
-      question: "What maintenance strategies does the app support?",
-      answer:
-        "Our model recommends 3+ optimized maintenance strategies including preventive maintenance, minor rehabilitation, and major reconstruction based on predicted road conditions.",
-    },
-    {
       question: "What is PCI?",
       answer:
         "PCI stands for Pavement Condition Index, which is a numerical rating (0-100) that indicates the condition of a road section, with 100 being the best possible condition.",
     },
     {
-      question: "How far into the future can the app predict?",
+      question: "How is PCI calculated?",
       answer:
-        "The app can predict road conditions up to 10 years into the future based on current conditions and deterioration patterns.",
-    },
-    {
-      question: "What data do I need to use the prediction tools?",
-      answer:
-        "You'll need basic information about the road section including current condition, traffic volume, and environmental factors for accurate predictions.",
-    },
-    {
-      question: "How can I contact the development team?",
-      answer:
-        "You can reach out to us through the 'Contact Us' option in the sidebar menu for any queries or feedback.",
-    },
-    {
-      question: "Is there a cost to use this app?",
-      answer:
-        "No, this app is completely free to use as it's developed as part of academic research to benefit rural road maintenance planning.",
-    },
-    {
-      question: "Can I use this for roads outside PMGSY?",
-      answer:
-        "While optimized for PMGSY roads, the prediction model can be adapted for other rural roads with similar characteristics.",
+        "PCI is calculated based on visual inspections of road conditions, including surface distresses like cracks, potholes, and ruts. The data is then analyzed to produce a score.\n5 - very good\n4 - good\n3 - fair\n2 - poor\n1 - very poor",
     },
   ];
 
@@ -67,7 +39,7 @@ const FAQScreen = ({ navigation }) => {
     <View style={styles.container}>
       <StatusBar backgroundColor={colors.primary} />
       <ImageBackground
-        source={require("./assets/img1.jpg")} // Updated path for Expo
+        source={require("./assets/img1.jpg")}
         style={styles.backgroundImage}
         resizeMode="cover"
       >
@@ -80,7 +52,9 @@ const FAQScreen = ({ navigation }) => {
             <FontAwesome name="arrow-left" size={24} color="#f5b301" />
           </TouchableOpacity>
           <View style={styles.headerContent}>
-            <Text style={styles.headerTitle}>Frequently Asked Questions</Text>
+            <Text style={[styles.headerTitle, { marginRight: 20 }]}>
+              Frequently Asked Questions
+            </Text>
           </View>
         </View>
 
@@ -154,7 +128,7 @@ const App = ({ navigation }) => {
     <View style={styles.container}>
       <StatusBar backgroundColor={colors.primary} />
       <ImageBackground
-        source={require("./assets/img1.jpg")} // Updated path for Expo
+        source={require("./assets/img1.jpg")}
         style={styles.backgroundImage}
         resizeMode="cover"
       >
@@ -229,7 +203,13 @@ const App = ({ navigation }) => {
                   <TouchableOpacity style={styles.sidebarLink}>
                     <Text style={styles.sidebarLinkText}>Calculate Budget</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.sidebarLink}>
+                  <TouchableOpacity
+                    style={styles.sidebarLink}
+                    onPress={() => {
+                      toggleSidebar();
+                      navigation.navigate("Contact");
+                    }}
+                  >
                     <Text style={styles.sidebarLinkText}>Contact Us</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -445,6 +425,7 @@ const styles = StyleSheet.create({
   },
   paddedContent: {
     paddingHorizontal: 16,
+    marginTop: 10,
   },
   header: {
     backgroundColor: colors.primary,
@@ -779,10 +760,10 @@ const AppWrapper = () => {
         <Stack.Screen name="Home" component={App} />
         <Stack.Screen name="FAQ" component={FAQScreen} />
         <Stack.Screen name="CalculatePCI" component={CalculatePCIScreen} />
+        <Stack.Screen name="Contact" component={ContactScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
 };
 
 export default AppWrapper;
-
