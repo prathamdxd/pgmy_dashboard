@@ -1,1305 +1,2072 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Development of Prediction Model of Rural Roads</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
-      rel="stylesheet"
-    />
-    <style>
-      :root {
-        --primary: #1e2328;
-        --primary-dark: #2a2e34;
-        --secondary: #3b3f46;
-        --accent: #f5b301;
-        --accent-light: #fed053;
-        --gray: #52575d;
-        --light: #f8f9fa;
-        --dark: #212529;
-        --white: #ffffff;
-        --card-shadow: 0 4px 6px rgba(0, 0, 0, 0.05),
-          0 1px 3px rgba(0, 0, 0, 0.1);
-        --transition: all 0.3s ease;
+import React, { useState, useRef, useEffect } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+  ImageBackground,
+  StatusBar,
+  Modal,
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Easing,
+  Dimensions,
+  Platform,
+} from "react-native";
+import { FontAwesome } from "@expo/vector-icons";
+import { BarChart, LineChart, PieChart } from "react-native-chart-kit";
+import * as FileSystem from "expo-file-system";
+import * as Sharing from "expo-sharing";
+import * as DocumentPicker from "expo-document-picker";
+import * as XLSX from "xlsx";
+import ViewShot from "react-native-view-shot";
+import DateTimePicker from "@react-native-community/datetimepicker";
+
+const colors = {
+  primary: "#1e2328",
+  primaryDark: "#2a2e34",
+  secondary: "#3b3f46",
+  accent: "#f5b301",
+  accentLight: "#fed053",
+  gray: "#52575d",
+  light: "#f8f9fa",
+  dark: "#212529",
+  white: "#ffffff",
+  textLight: "#f8f9fa",
+};
+
+const getConditionBackgroundColor = (condition) => {
+  switch (condition) {
+    case "Very Good":
+      return "#2ecc71"; // Green
+    case "Good":
+      return "#27ae60"; // Darker Green
+    case "Fair":
+      return "#f39c12"; // Orange
+    case "Poor":
+      return "#e74c3c"; // Red
+    case "Very Poor":
+      return "#c0392b"; // Dark Red
+    case "Failed":
+      return "#7f8c8d"; // Gray
+    default:
+      return "#3b3f46"; // Default (secondary)
+  }
+};
+
+const CustomScrollView = ({ children, ...props }) => {
+  if (Platform.OS === "android") {
+    return (
+      <ScrollView
+        {...props}
+        style={[styles.scrollView, props.style]}
+        contentContainerStyle={[
+          styles.scrollViewContent,
+          props.contentContainerStyle,
+        ]}
+        persistentScrollbar={true}
+        indicatorStyle="white"
+        scrollIndicatorInsets={{ right: 1 }}
+      >
+        {children}
+      </ScrollView>
+    );
+  }
+  return (
+    <ScrollView
+      {...props}
+      indicatorStyle="white"
+      scrollIndicatorInsets={{ right: 1 }}
+      showsVerticalScrollIndicator={true}
+      showsHorizontalScrollIndicator={true}
+    >
+      {children}
+    </ScrollView>
+  );
+};
+
+const screenWidth = Dimensions.get("window").width;
+const MAX_ROADS_PER_CHART = 5;
+
+const CalculatePCIScreen = ({ navigation }) => {
+  const [userName, setUserName] = useState("");
+  const [year1, setYear1] = useState("");
+  const [year2, setYear2] = useState("");
+  const [numRoads, setNumRoads] = useState("1");
+  const [roads, setRoads] = useState([]);
+  const [results, setResults] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [excelLoading, setExcelLoading] = useState(false);
+  const [excelSelectLoading, setExcelSelectLoading] = useState(false);
+  const [roadForms, setRoadForms] = useState([]);
+  const [currentScreen, setCurrentScreen] = useState("userInfo");
+  const [showLineCharts, setShowLineCharts] = useState(false);
+  const [showConditionModal, setShowConditionModal] = useState(false);
+  const [selectedChartData, setSelectedChartData] = useState(null);
+  const [showScrollButton, setShowScrollButton] = useState(false);
+
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(100)).current;
+  const modalSlideAnim = useRef(new Animated.Value(300)).current;
+  const scrollButtonOpacity = useRef(new Animated.Value(0)).current;
+
+  // Refs
+  const resultsScrollViewRef = useRef();
+  const inputScrollViewRef = useRef();
+  const analyzeButtonRef = useRef();
+  const lineChartRefs = useRef([]);
+  const pieChartRefs = useRef([]);
+
+  const [surveyDate, setSurveyDate] = useState(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [yearError, setYearError] = useState("");
+
+  // PCI Dataset
+  const pciDataset = {
+    "4-4": { 2: 56.32, 4: 42.58, 6: 31.08, 8: 22.84, 10: 17.49 },
+    "3-3": { 2: 40.74, 4: 28.94, 6: 21.03, 8: 16.2, 10: 13.4 },
+    "4-3": { 2: 40.74, 4: 28.94, 6: 21.03, 8: 16.2, 10: 13.4 },
+    "5-5": { 2: 68.35, 4: 54.04, 6: 40.73, 8: 29.91, 10: 22.18 },
+    "5-4": { 2: 56.32, 4: 42.58, 6: 31.08, 8: 22.84, 10: 17.49 },
+    "2-1": { 2: 10.0, 4: 10.0, 6: 10.0, 8: 10.0, 10: 10.0 },
+    "3-2": { 2: 18.37, 4: 13.51, 6: 11.47, 8: 10.61, 10: 10.26 },
+    "1-1": { 2: 10.0, 4: 10.0, 6: 10.0, 8: 10.0, 10: 10.0 },
+    "2-2": { 2: 18.37, 4: 13.51, 6: 11.47, 8: 10.61, 10: 10.26 },
+  };
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 400,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [currentScreen]);
+
+  useEffect(() => {
+    if (currentScreen === "results" && resultsScrollViewRef.current) {
+      setTimeout(() => {
+        resultsScrollViewRef.current.scrollTo({ y: 0, animated: true });
+      }, 100);
+    }
+  }, [currentScreen, results]);
+
+  useEffect(() => {
+    if (year1 && year2) {
+      const year1Num = parseInt(year1);
+      const year2Num = parseInt(year2);
+
+      if (year2Num !== year1Num + 2) {
+        setYearError(`Year 2 must be ${year1Num + 2}`);
+      } else {
+        setYearError("");
+      }
+    } else {
+      setYearError("");
+    }
+  }, [year1, year2]);
+
+  const handleDateChange = (event, selectedDate) => {
+    setShowDatePicker(false);
+    if (selectedDate) {
+      setSurveyDate(selectedDate);
+    }
+  };
+
+  const animateModal = (show) => {
+    Animated.timing(modalSlideAnim, {
+      toValue: show ? 0 : 300,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const [showScrollUpButton, setShowScrollUpButton] = useState(false);
+
+  const handleScroll = (event) => {
+    const offsetY = event.nativeEvent.contentOffset.y;
+    const contentHeight = event.nativeEvent.contentSize.height;
+    const layoutHeight = event.nativeEvent.layoutMeasurement.height;
+
+    // Show scroll down button if not near bottom
+    const shouldShowDown = offsetY < contentHeight - layoutHeight - 100;
+    if (shouldShowDown !== showScrollButton) {
+      setShowScrollButton(shouldShowDown);
+      Animated.timing(scrollButtonOpacity, {
+        toValue: shouldShowDown ? 1 : 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    }
+
+    // Show scroll up button if not near top
+    const shouldShowUp = offsetY > 100;
+    if (shouldShowUp !== showScrollUpButton) {
+      setShowScrollUpButton(shouldShowUp);
+    }
+  };
+
+  const scrollToBottom = () => {
+    const scrollView =
+      currentScreen === "input"
+        ? inputScrollViewRef.current
+        : resultsScrollViewRef.current;
+    if (scrollView) {
+      scrollView.scrollToEnd({ animated: true });
+    }
+  };
+
+  const scrollToTop = () => {
+    const scrollView =
+      currentScreen === "input"
+        ? inputScrollViewRef.current
+        : resultsScrollViewRef.current;
+    if (scrollView) {
+      scrollView.scrollTo({ y: 0, animated: true });
+    }
+  };
+
+  const captureAndShareGraph = async (ref, name) => {
+    try {
+      if (ref && ref.current) {
+        const uri = await ref.current.capture();
+        await Sharing.shareAsync(uri, {
+          mimeType: "image/jpeg",
+          dialogTitle: `Share ${name}`,
+          UTI: "public.jpeg",
+        });
+      }
+    } catch (error) {
+      console.error("Error capturing graph:", error);
+      Alert.alert("Error", "Failed to save graph image");
+    }
+  };
+
+  const uploadExcel = async () => {
+    try {
+      setExcelSelectLoading(true);
+
+      const result = await DocumentPicker.getDocumentAsync({
+        type: [
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "application/vnd.ms-excel",
+        ],
+        copyToCacheDirectory: true,
+      });
+
+      if (result.type === "cancel") {
+        setExcelSelectLoading(false);
+        return;
       }
 
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
+      if (!result.assets || result.assets.length === 0) {
+        throw new Error("No file selected");
       }
 
-      body {
-        font-family: "Inter", sans-serif;
-        background-color: #f5f7fb;
-        background-image: url("img1.jpg");
-        background-size: cover;
-        background-position: center;
-        background-repeat: no-repeat;
-        background-attachment: fixed;
-        color: var(--dark);
-        line-height: 1.6;
-        padding: 0;
-        margin: 0;
+      const file = result.assets[0];
+      if (!file.uri) {
+        throw new Error("File URI is invalid");
       }
 
-      .container {
-        max-width: 1400px;
-        margin: 0 auto;
-        padding: 0 2rem;
-      }
+      setExcelSelectLoading(false);
+      setExcelLoading(true);
 
-      @media (min-width: 768px) {
-        .container {
-          padding: 0 10rem;
-        }
-      }
+      const fileUri = file.uri;
+      const fileContent = await FileSystem.readAsStringAsync(fileUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
 
-      header {
-        background: linear-gradient(
-          135deg,
-          var(--primary),
-          var(--primary-dark)
+      const workbook = XLSX.read(fileContent, { type: "base64" });
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+      const requiredColumns = [
+        "roadname",
+        `pcivalue_${year1}`,
+        `pcivalue_${year2}`,
+      ];
+      const sampleRow = jsonData[0] || {};
+      const missingColumns = requiredColumns.filter(
+        (col) => !(col in sampleRow)
+      );
+
+      if (missingColumns.length > 0) {
+        throw new Error(
+          `Missing required columns: ${missingColumns.join(", ")}`
         );
-        color: white;
-        padding: 4rem 0;
-        margin-bottom: 2rem;
-        border-radius: 0 0 12px 12px;
-        box-shadow: var(--card-shadow);
       }
 
-      .header-content {
-        max-width: 1400px;
-        margin: 0 auto;
-        padding: 0 2rem;
+      const forms = jsonData.map((item, index) => ({
+        id: index,
+        roadName: item.roadname || "",
+        pciYear1: item[`pcivalue_${year1}`]
+          ? item[`pcivalue_${year1}`].toString()
+          : "",
+        pciYear2: item[`pcivalue_${year2}`]
+          ? item[`pcivalue_${year2}`].toString()
+          : "",
+      }));
+
+      setRoadForms(forms);
+      setNumRoads(forms.length.toString());
+
+      if (inputScrollViewRef.current) {
+        setTimeout(() => {
+          inputScrollViewRef.current.scrollToEnd({ animated: true });
+        }, 350);
       }
 
-      h1 {
-        font-size: 2rem;
-        font-weight: 700;
-        margin-bottom: 0.5rem;
+      Alert.alert("Success", "Excel data loaded successfully!");
+    } catch (error) {
+      console.error("Upload error:", error);
+      Alert.alert("Error", error.message || "Failed to process Excel file");
+    } finally {
+      setExcelSelectLoading(false);
+      setExcelLoading(false);
+    }
+  };
+
+  const createRoadForms = () => {
+    const num = parseInt(numRoads);
+    if (isNaN(num) || num < 1) {
+      Alert.alert("Error", "Please enter a valid number of roads (at least 1)");
+      return;
+    }
+
+    const forms = [];
+    for (let i = 0; i < num; i++) {
+      forms.push({
+        id: i,
+        roadName: "",
+        pciYear1: "",
+        pciYear2: "",
+      });
+    }
+
+    setRoadForms(forms);
+  };
+
+  const handleRoadInputChange = (index, field, value) => {
+    const updatedForms = [...roadForms];
+    updatedForms[index][field] = value;
+    setRoadForms(updatedForms);
+  };
+
+  const predictPCIs = (roads) => {
+    const yearGap = parseInt(year2) - parseInt(year1);
+    const startYear = parseInt(year2);
+    const predictionYears = Array.from(
+      { length: 5 },
+      (_, i) => startYear + (i + 1) * yearGap
+    );
+
+    return {
+      roads: roads.map((road) => {
+        const key = `${road.pciYear1}-${road.pciYear2}`;
+        const predictions =
+          pciDataset[key] || getDefaultPrediction(road.pciYear2);
+
+        return {
+          name: road.roadName,
+          pci_year2: road.pciYear2,
+          projections: Object.fromEntries(
+            predictionYears.map((year, idx) => {
+              const yearDiff = year - startYear;
+              const pciValue =
+                predictions[yearDiff] || predictions[10] * (10 / yearDiff);
+              return [
+                year,
+                {
+                  pci: pciValue,
+                  condition: classifyPCI(pciValue),
+                },
+              ];
+            })
+          ),
+        };
+      }),
+      years: predictionYears,
+    };
+  };
+
+  const getDefaultPrediction = (currentPCI) => {
+    const baseValue = currentPCI * 20;
+    return {
+      2: baseValue * 0.9,
+      4: baseValue * 0.75,
+      6: baseValue * 0.6,
+      8: baseValue * 0.45,
+      10: baseValue * 0.3,
+    };
+  };
+
+  const classifyPCI = (value) => {
+    if (value > 85) return "Very Good";
+    if (value > 65) return "Good";
+    if (value > 50) return "Fair";
+    if (value > 25) return "Poor";
+    if (value > 10) return "Very Poor";
+    return "Failed";
+  };
+
+  const getBadgeStyle = (condition) => {
+    switch (condition) {
+      case "Very Good":
+        return styles.badgeVeryGood;
+      case "Good":
+        return styles.badgeGood;
+      case "Fair":
+        return styles.badgeFair;
+      case "Poor":
+        return styles.badgePoor;
+      case "Very Poor":
+        return styles.badgeVeryPoor;
+      case "Failed":
+        return styles.badgeFailed;
+      default:
+        return {};
+    }
+  };
+
+  const saveUserInfo = () => {
+    if (!userName.trim()) {
+      Alert.alert("Error", "Please enter your name");
+      return;
+    }
+
+    if (!surveyDate) {
+      Alert.alert("Error", "Please select survey date");
+      return;
+    }
+
+    if (!year1 || isNaN(year1) || !year2 || isNaN(year2)) {
+      Alert.alert("Error", "Please enter valid years");
+      return;
+    }
+
+    const year1Num = parseInt(year1);
+    const year2Num = parseInt(year2);
+
+    if (year2Num !== year1Num + 2) {
+      Alert.alert(
+        "Invalid Year Gap",
+        `Year 2 must be exactly 2 years after Year 1.\nExample: If Year 1 is ${year1Num}, Year 2 should be ${
+          year1Num + 2
+        }`
+      );
+      return;
+    }
+
+    setCurrentScreen("input");
+  };
+
+  const analyzeRoads = async () => {
+    for (let i = 0; i < roadForms.length; i++) {
+      const form = roadForms[i];
+      if (!form.roadName.trim()) {
+        Alert.alert("Error", `Please enter a road name for Road ${i + 1}`);
+        return;
       }
 
-      h2 {
-        font-size: 2rem;
-        font-weight: 600;
-        margin-bottom: 1.5rem;
-        color: var(--primary);
-      }
-
-      h3 {
-        font-size: 1.4rem;
-        font-weight: 600;
-        margin-bottom: 1rem;
-        color: var(--primary);
-      }
-
-      h4 {
-        font-size: 2rem;
-        font-weight: 500;
-        margin-bottom: 0.75rem;
-        color: var(--gray);
-      }
-
-      .card {
-        background-color: rgba(231, 231, 231, 0.8);
-        border-radius: 12px;
-        padding: 2rem;
-        margin-bottom: 2rem;
-        box-shadow: var(--card-shadow);
-        transition: var(--transition);
-        border: 1px solid #eaeaea;
-      }
-
-      @media (min-width: 768px) {
-        .card {
-          padding: 3rem;
-        }
-      }
-
-      .card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1),
-          0 4px 6px rgba(0, 0, 0, 0.05);
-      }
-
-      .form-group {
-        margin-bottom: 1rem;
-      }
-
-      label {
-        display: block;
-        margin-bottom: 0.5rem;
-        font-weight: 500;
-        color: var(--primary);
-        font-size: 1.1rem;
-      }
-
-      input,
-      select,
-      textarea {
-        padding: 0.5rem 0.75rem;
-        border: 1px solid #e2e8f0;
-        border-radius: 6px;
-        font-size: 0.9rem;
-        transition: var(--transition);
-        background-color: var(--white);
-        /* width: 100%; */
-      }
-
-      input:focus,
-      select:focus,
-      textarea:focus {
-        outline: none;
-        border-color: var(--accent);
-        box-shadow: 0 0 0 3px rgba(245, 179, 1, 0.2);
-      }
-
-      .btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0.5rem 1.25rem;
-        border-radius: 6px;
-        font-size: 1.1rem;
-        font-weight: 500;
-        cursor: pointer;
-        transition: var(--transition);
-        border: none;
-        text-decoration: none;
-        color: white;
-        margin-bottom: 15px;
-        width: 100%;
-      }
-
-      @media (min-width: 768px) {
-        .btn {
-          width: auto;
-        }
-      }
-
-      .btn-primary {
-        background-color: var(--primary);
-        color: var(--white);
-      }
-
-      .btn-primary:hover {
-        background-color: var(--primary-dark);
-        transform: translateY(-1px);
-      }
-
-      .btn-accent {
-        background-color: var(--primary);
-        color: var(--white);
-      }
-
-      .btn-accent:hover {
-        background-color: var(--accent);
-        transform: translateY(-1px);
-        color: var(--dark);
-      }
-
-      .btn-group {
-        display: flex;
-        gap: 0.75rem;
-        margin-top: 1rem;
-        flex-direction: column;
-      }
-
-      @media (min-width: 768px) {
-        .btn-group {
-          flex-direction: row;
-        }
-      }
-
-      .road-form {
-        background-color: var(--light);
-        border-radius: 8px;
-        padding: 1.5rem 3.5rem;
-        margin-bottom: 1.25rem;
-        border-left: 4px solid var(--accent);
-      }
-
-      table {
-        width: 100%;
-        border-collapse: separate;
-        border-spacing: 0;
-        margin: 1.5rem 0;
-        background-color: var(--white);
-        border-radius: 8px;
-        overflow: hidden;
-        box-shadow: var(--card-shadow);
-        font-size: 0.9rem;
-      }
-
-      th,
-      td {
-        padding: 0.75rem;
-        text-align: left;
-        border-bottom: 1px solid #e2e8f0;
-      }
-
-      th {
-        background-color: #ffbf5c;
-        font-weight: 600;
-        color: var(--primary);
-        text-transform: uppercase;
-        font-size: 0.8rem;
-        letter-spacing: 0.5px;
-      }
-
-      tr:hover td {
-        background-color: #f8fafc;
-      }
-
-      .chart-container {
-        background-color: var(--white);
-        border-radius: 12px;
-        padding: 1rem;
-        margin-bottom: 2rem;
-        box-shadow: var(--card-shadow);
-        height: 400px;
-        border: 1px solid #eaeaea;
-      }
-
-      .pci-scale {
-        margin: 2rem 0;
-      }
-
-      .very-good {
-        background-color: #2ecc71;
-        color: white;
-      }
-
-      .good {
-        background-color: #27ae60;
-        color: white;
-      }
-
-      .fair {
-        background-color: #f39c12;
-        color: white;
-      }
-
-      .poor {
-        background-color: #e74c3c;
-        color: white;
-      }
-
-      .very-poor {
-        background-color: #c0392b;
-        color: white;
-      }
-
-      .failed {
-        background-color: #7f8c8d;
-        color: white;
-      }
-
-      .badge {
-        display: inline-block;
-        padding: 0.25rem 0.5rem;
-        font-size: 0.75rem;
-        font-weight: 600;
-        line-height: 1;
-        text-align: center;
-        white-space: nowrap;
-        vertical-align: baseline;
-        border-radius: 4px;
-      }
-
-      .badge-very-good {
-        background-color: #2ecc71;
-        color: white;
-      }
-
-      .badge-good {
-        background-color: #27ae60;
-        color: white;
-      }
-
-      .badge-fair {
-        background-color: #f39c12;
-        color: white;
-      }
-
-      .badge-poor {
-        background-color: #e74c3c;
-        color: white;
-      }
-
-      .badge-very-poor {
-        background-color: #c0392b;
-        color: white;
-      }
-
-      .badge-failed {
-        background-color: #7f8c8d;
-        color: white;
-      }
-
-      .grid {
-        display: grid;
-        grid-template-columns: 1fr;
-        gap: 1.5rem;
-      }
-
-      @media (min-width: 992px) {
-        .grid {
-          grid-template-columns: repeat(2, 1fr);
-        }
-      }
-
-      .hidden {
-        display: none;
-      }
-
-      .logo {
-        font-weight: 700;
-        font-size: 1.25rem;
-        margin-bottom: 1rem;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-      }
-
-      .logo-icon {
-        width: 50px;
-        height: 28px;
-        background-color: var(--accent);
-        border-radius: 6px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: var(--primary);
-        font-weight: 800;
-      }
-
-      .spinner {
-        display: inline-block;
-        width: 1rem;
-        height: 1rem;
-        border: 2px solid rgba(255, 255, 255, 0.3);
-        border-radius: 50%;
-        border-top-color: white;
-        animation: spin 1s ease-in-out infinite;
-        margin-right: 8px;
-      }
-
-      @keyframes spin {
-        to {
-          transform: rotate(360deg);
-        }
-      }
-
-      .loading-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background-color: rgba(0, 0, 0, 0.5);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        z-index: 1000;
-      }
-
-      .loading-content {
-        background-color: white;
-        padding: 2rem;
-        border-radius: 8px;
-        text-align: center;
-      }
-      /* Navigation */
-      .navbar {
-        background: linear-gradient(
-          135deg,
-          var(--primary),
-          var(--primary-dark)
+      if (!form.pciYear1 || isNaN(form.pciYear1)) {
+        Alert.alert(
+          "Error",
+          `Please enter a valid PCI ${year1} value for Road ${i + 1}`
         );
-        color: white;
-        padding: 1rem 2rem;
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        z-index: 100;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        return;
       }
 
-      .nav-logo {
-        font-weight: 700;
-        font-size: 1.2rem;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        color: white;
-        text-decoration: none;
-      }
-
-      .nav-logo-icon {
-        width: 50px;
-        height: 22px;
-        background-color: var(--accent);
-        border-radius: 4px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: var(--primary);
-        font-weight: 700;
-      }
-
-      .nav-links {
-        display: flex;
-        gap: 1.5rem;
-      }
-
-      .nav-links a {
-        color: var(--text-light);
-        text-decoration: none;
-        font-weight: 500;
-        transition: var(--transition);
-        padding: 0.5rem 0;
-        position: relative;
-      }
-
-      .nav-links a:hover {
-        color: var(--accent);
-      }
-
-      .nav-links a::after {
-        content: "";
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        width: 0;
-        height: 2px;
-        background-color: var(--accent);
-        transition: var(--transition);
-      }
-
-      .nav-links a:hover::after {
-        width: 100%;
-      }
-
-      .mobile-menu-btn {
-        display: none;
-        background: none;
-        border: none;
-        color: white;
-        font-size: 1.5rem;
-        cursor: pointer;
-      }
-
-      /* Sidebar */
-      .sidebar {
-        position: fixed;
-        top: 0;
-        right: -300px;
-        width: 280px;
-        height: 100%;
-        background: linear-gradient(
-          135deg,
-          var(--primary),
-          var(--primary-dark)
+      if (!form.pciYear2 || isNaN(form.pciYear2)) {
+        Alert.alert(
+          "Error",
+          `Please enter a valid PCI ${year2} value for Road ${i + 1}`
         );
-        z-index: 1000;
-        transition: var(--transition);
-        padding: 2rem;
-        box-shadow: -5px 0 15px rgba(0, 0, 0, 0.2);
+        return;
       }
 
-      .sidebar.open {
-        right: 0;
+      const pciYear1 = parseInt(form.pciYear1);
+      const pciYear2 = parseInt(form.pciYear2);
+
+      if (pciYear1 < 1 || pciYear1 > 5 || pciYear2 < 1 || pciYear2 > 5) {
+        Alert.alert(
+          "Error",
+          `PCI values must be between 1 and 5 for Road ${i + 1}`
+        );
+        return;
       }
+    }
 
-      .sidebar-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 2rem;
-      }
+    setLoading(true);
 
-      .sidebar-links {
-        display: flex;
-        flex-direction: column;
-        gap: 1rem;
-      }
+    const roadsData = roadForms.map((form) => ({
+      roadName: form.roadName,
+      pciYear1: parseInt(form.pciYear1),
+      pciYear2: parseInt(form.pciYear2),
+    }));
 
-      .sidebar-links a {
-        color: white;
-        text-decoration: none;
-        font-weight: 500;
-        padding: 0.75rem 1rem;
-        border-radius: 6px;
-        transition: var(--transition);
-      }
+    await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      .sidebar-links a:hover {
-        color: var(--accent);
-        background-color: rgba(255, 255, 255, 0.1);
-      }
+    const results = predictPCIs(roadsData);
+    setResults(results);
+    setLoading(false);
+    setCurrentScreen("results");
+  };
 
-      .close-sidebar {
-        background: none;
-        border: none;
-        color: white;
-        font-size: 1.5rem;
-        cursor: pointer;
-      }
+  const downloadCSV = async () => {
+    if (!results) return;
 
-      .overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background-color: rgba(0, 0, 0, 0.5);
-        z-index: 999;
-        opacity: 0;
-        pointer-events: none;
-        transition: var(--transition);
-      }
+    const formattedDate = surveyDate.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
 
-      .overlay.active {
-        opacity: 1;
-        pointer-events: all;
-      }
+    let csvContent = `Surveyor Name:,${userName}\n`;
+    csvContent += `Survey Date:,${formattedDate}\n\n`;
 
-      @media (max-width: 768px) {
-        .nav-links {
-          display: none;
-        }
+    csvContent += `Road Name,PCI ${year2}`;
+    results.years.forEach((year) => {
+      csvContent += `,PCI ${year}`;
+    });
+    csvContent += "\n";
 
-        .mobile-menu-btn {
-          display: block;
-        }
-      }
+    results.roads.forEach((road) => {
+      csvContent += `${road.name},${road.pci_year2}(${classifyPCI(
+        road.pci_year2 * 20
+      )})`;
 
-      /* Adjust header margin to account for fixed navbar */
-      header {
-        margin-top: 70px;
-      }
-    </style>
-  </head>
-  <body>
-    <!-- Navigation Bar -->
-    <nav class="navbar">
-      <a href="home.html" class="nav-logo">
-        <div class="nav-logo-icon">RPM</div>
-        <span>Rural Roads</span>
-      </a>
+      results.years.forEach((year) => {
+        const pciValue = road.projections[year].pci.toFixed(2);
+        const condition = road.projections[year].condition;
+        csvContent += `,${pciValue}(${condition})`;
+      });
 
-      <div class="nav-links">
-        <a href="home.html">Home</a>
-        <a href="calculate-PCI.html">Calculate PCI</a>
-        <a href="calculate-budget.html">Calculate Budget</a>
-        <a href="contact-us.html">Contact Us</a>
-      </div>
+      csvContent += "\n";
+    });
 
-      <button class="mobile-menu-btn" id="mobileMenuBtn">☰</button>
-    </nav>
+    const fileUri =
+      FileSystem.documentDirectory + "rural_roads_pci_analysis.csv";
+    await FileSystem.writeAsStringAsync(fileUri, csvContent);
+    await Sharing.shareAsync(fileUri, {
+      mimeType: "text/csv",
+      dialogTitle: "Share PCI Analysis Results",
+      UTI: "public.comma-separated-values-text",
+    });
+  };
 
-    <!-- Mobile Sidebar -->
-    <div class="sidebar" id="sidebar">
-      <div class="sidebar-header">
-        <a href="home.html" class="nav-logo">
-          <div class="nav-logo-icon">RPM</div>
-          <span>Rural Roads</span>
-        </a>
-        <button class="close-sidebar" id="closeSidebar">×</button>
-      </div>
+  const renderUserInfoScreen = () => (
+    <Animated.View
+      style={[
+        styles.userInfoContainer,
+        {
+          opacity: fadeAnim,
+          transform: [{ translateY: slideAnim }],
+        },
+      ]}
+    >
+      <View style={styles.card}>
+        <Text style={[styles.cardTitle, { color: colors.accent }]}>
+          Enter Your Information
+        </Text>
 
-      <div class="sidebar-links">
-        <a href="home.html">Home</a>
-        <a href="calculate-pci.html">Calculate PCI</a>
-        <a href="calculate-budget.html">Calculate Budget</a>
-        <a href="contact-us.html">Contact Us</a>
-      </div>
-    </div>
-
-    <div class="overlay" id="overlay"></div>
-    <header>
-      <div class="header-content">
-        <div class="logo">
-          <div class="logo-icon">RPM</div>
-          <span>Rural Roads Prediction Model</span>
-        </div>
-        <h1>
-          Development of Prediction Model of
-          <span style="color: var(--accent)">Rural Roads</span>
-        </h1>
-        <p>Advanced predictive analytics for rural road maintenance planning</p>
-      </div>
-    </header>
-
-    <div class="container">
-      <div class="card">
-        <h2>Enter Road Details</h2>
-        <div class="form-group">
-          <label for="numRoads">Number of roads to analyze:</label>
-          <input
-            type="number"
-            id="numRoads"
-            min="1"
-            value="1"
-            aria-label="Number of roads to analyze"
+        <View style={styles.formGroup}>
+          <Text style={styles.label}>Your Name:</Text>
+          <TextInput
+            style={styles.input}
+            value={userName}
+            onChangeText={setUserName}
+            placeholder="Enter your name"
+            placeholderTextColor="#999"
           />
-        </div>
+        </View>
 
-        <div class="btn-group">
-          <button
-            class="btn btn-accent"
-            onclick="createRoadForms()"
-            aria-label="Create forms"
+        <View style={styles.formGroup}>
+          <Text style={styles.label}>Survey Date:</Text>
+          <TouchableOpacity
+            style={styles.dateInput}
+            onPress={() => setShowDatePicker(true)}
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              fill="currentColor"
-              viewBox="0 0 16 16"
-              style="margin-right: 8px"
-              aria-hidden="true"
-            >
-              <path
-                d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"
-              />
-            </svg>
-            Create Forms
-          </button>
-        </div>
+            <Text style={surveyDate ? styles.dateText : styles.placeholderText}>
+              {surveyDate
+                ? surveyDate.toLocaleDateString("en-GB")
+                : "Enter survey date"}
+            </Text>
+          </TouchableOpacity>
+          {showDatePicker && (
+            <DateTimePicker
+              value={surveyDate || new Date()}
+              mode="date"
+              display="default"
+              onChange={handleDateChange}
+            />
+          )}
+        </View>
 
-        <div id="roadFormsContainer"></div>
+        <View style={styles.formGroup}>
+          <Text style={styles.label}>First Year (e.g., 2025):</Text>
+          <TextInput
+            style={styles.input}
+            keyboardType="numeric"
+            value={year1}
+            onChangeText={setYear1}
+            placeholder="Enter first year (e.g., 2025)"
+            placeholderTextColor="#999"
+          />
+        </View>
 
-        <button
-          id="analyzeBtn"
-          class="btn btn-primary hidden"
-          onclick="analyzeRoads()"
-          aria-label="Analyze roads"
+        <View style={styles.formGroup}>
+          <Text style={styles.label}>
+            Second Year (must be {year1 ? parseInt(year1) + 2 : "Year 2027"}):
+          </Text>
+          <TextInput
+            style={styles.input}
+            keyboardType="numeric"
+            value={year2}
+            onChangeText={setYear2}
+            placeholder={`Enter ${year1 ? parseInt(year1) + 2 : "Year 2027"}`}
+            placeholderTextColor="#999"
+          />
+          {yearError ? <Text style={styles.errorText}>{yearError}</Text> : null}
+        </View>
+
+        <TouchableOpacity
+          style={styles.button}
+          onPress={saveUserInfo}
+          activeOpacity={0.7}
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="16"
-            height="16"
-            fill="currentColor"
-            viewBox="0 0 16 16"
-            style="margin-right: 8px"
-            aria-hidden="true"
-          >
-            <path
-              d="M11.534 7h3.932a.25.25 0 0 1 .192.41l-1.966 2.36a.25.25 0 0 1-.384 0l-1.966-2.36a.25.25 0 0 1 .192-.41zm-11 2h3.932a.25.25 0 0 0 .192-.41L2.692 6.23a.25.25 0 0 0-.384 0L.342 8.59A.25.25 0 0 0 .534 9z"
-            />
-            <path
-              fill-rule="evenodd"
-              d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 1 1-.771-.636A6.002 6.002 0 0 1 13.917 7H12.9A5.002 5.002 0 0 0 8 3zM3.1 9a5.002 5.002 0 0 0 8.757 2.182.5.5 0 1 1 .771.636A6.002 6.002 0 0 1 2.083 9H3.1z"
-            />
-          </svg>
-          Analyze Roads
-        </button>
-      </div>
+          <Text style={[styles.buttonText, { color: colors.accent }]}>
+            Continue
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </Animated.View>
+  );
 
-      <div id="resultsSection" class="hidden" aria-live="polite">
-        <div class="card">
-          <h2>Analysis Results</h2>
+  const renderInputScreen = () => (
+    <Animated.ScrollView
+      ref={inputScrollViewRef}
+      contentContainerStyle={[styles.scrollContainer, { paddingBottom: 30 }]}
+      showsVerticalScrollIndicator={true}
+      scrollEventThrottle={16}
+      style={{
+        opacity: fadeAnim,
+        transform: [{ translateY: slideAnim }],
+      }}
+      indicatorStyle="white"
+      scrollIndicatorInsets={{ right: 1 }}
+      onScroll={handleScroll}
+    >
+      <View style={styles.paddedContent}>
+        <View style={[styles.card, { marginTop: 10 }]}>
+          <Text style={[styles.cardTitle, { color: colors.accent }]}>
+            PCI Calculator
+          </Text>
+          <Text style={styles.userInfoText}>
+            Surveyor: {userName} | Years: {year1} and {year2}
+          </Text>
 
-          <div id="resultsTable"></div>
-
-          <div class="btn-group">
-            <button
-              id="downloadBtn"
-              class="btn btn-accent"
-              onclick="downloadCSV()"
-              aria-label="Download results as CSV"
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>Upload Excel File:</Text>
+            <Text style={styles.helperText}>
+              Required columns: roadname, pcivalue_{year1}, pcivalue_{year2}
+            </Text>
+            <TouchableOpacity
+              style={styles.excelButton}
+              onPress={uploadExcel}
+              disabled={excelLoading || excelSelectLoading}
+              activeOpacity={0.7}
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                fill="currentColor"
-                viewBox="0 0 16 16"
-                style="margin-right: 8px"
-                aria-hidden="true"
-              >
-                <path
-                  d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"
+              {excelSelectLoading ? (
+                <ActivityIndicator color="#ffffff" />
+              ) : (
+                <Text style={styles.excelButtonText}>Select Excel File</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.divider} />
+
+          <View style={styles.formGroup}>
+            <Text style={[styles.label, { textAlign: "center" }]}>
+              Or enter manually:
+            </Text>
+            <Text style={styles.label}>Number of roads:</Text>
+            <TextInput
+              style={styles.input}
+              keyboardType="numeric"
+              value={numRoads}
+              onChangeText={setNumRoads}
+              placeholder="Enter number of roads"
+              placeholderTextColor="#999"
+            />
+          </View>
+
+          <TouchableOpacity
+            style={styles.button}
+            onPress={createRoadForms}
+            disabled={loading || excelLoading || excelSelectLoading}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.buttonText, { color: colors.accent }]}>
+              Create Forms
+            </Text>
+          </TouchableOpacity>
+
+          {roadForms.map((form, index) => (
+            <Animated.View
+              key={index}
+              style={[
+                styles.roadForm,
+                {
+                  opacity: fadeAnim,
+                  transform: [{ translateY: slideAnim }],
+                },
+              ]}
+            >
+              <Text style={[styles.cardTitle, { color: colors.accent }]}>
+                Road {index + 1} Details
+              </Text>
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Road Name:</Text>
+                <TextInput
+                  style={styles.input}
+                  value={form.roadName}
+                  onChangeText={(text) =>
+                    handleRoadInputChange(index, "roadName", text)
+                  }
+                  placeholder="Enter road name"
+                  placeholderTextColor="#999"
                 />
-                <path
-                  d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"
+              </View>
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>PCI {year1} (1-5):</Text>
+                <TextInput
+                  style={styles.input}
+                  keyboardType="numeric"
+                  value={form.pciYear1}
+                  onChangeText={(text) =>
+                    handleRoadInputChange(index, "pciYear1", text)
+                  }
+                  placeholder={`Enter PCI (1-5) for ${year1}`}
+                  placeholderTextColor="#999"
                 />
-              </svg>
-              Download Results as CSV
-            </button>
-          </div>
-        </div>
+              </View>
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>PCI {year2} (1-5):</Text>
+                <TextInput
+                  style={styles.input}
+                  keyboardType="numeric"
+                  value={form.pciYear2}
+                  onChangeText={(text) =>
+                    handleRoadInputChange(index, "pciYear2", text)
+                  }
+                  placeholder={`Enter PCI (1-5) for ${year2}`}
+                  placeholderTextColor="#999"
+                />
+              </View>
+            </Animated.View>
+          ))}
 
-        <div class="grid">
-          <div class="card">
-            <h3>Line Chart of PCI Values Over Years</h3>
-            <div class="chart-container">
-              <canvas
-                id="pciLineChart"
-                aria-label="Line chart showing PCI values over years"
-              ></canvas>
-            </div>
-          </div>
+          {roadForms.length > 0 && (
+            <TouchableOpacity
+              ref={analyzeButtonRef}
+              style={[
+                styles.toggleButton,
+                { width: "100%", marginBottom: 10, padding: 12 },
+              ]}
+              onPress={analyzeRoads}
+              disabled={loading || excelLoading || excelSelectLoading}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.buttonText}>
+                {loading ? "Analyzing..." : "Analyze Roads"}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    </Animated.ScrollView>
+  );
 
-          <div class="card">
-            <h3>Bar Chart of PCI Values by Road</h3>
-            <div class="chart-container">
-              <canvas
-                id="pciBarChart"
-                aria-label="Bar chart showing PCI values by road"
-              ></canvas>
-            </div>
-          </div>
-        </div>
+  const renderResultsScreen = () => {
+    if (!results) return null;
 
-        <div class="card pci-scale">
-          <h3>PCI Condition Classification</h3>
-          <table>
-            <thead>
-              <tr>
-                <th>PCI Range</th>
-                <th>Condition</th>
-                <th>Recommended Treatment</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr class="very-good">
-                <td>85-100</td>
-                <td><span class="badge badge-very-good">Very Good</span></td>
-                <td>Preventive maintenance only</td>
-              </tr>
-              <tr class="good">
-                <td>65-85</td>
-                <td><span class="badge badge-good">Good</span></td>
-                <td>Minor rehabilitation</td>
-              </tr>
-              <tr class="fair">
-                <td>50-65</td>
-                <td><span class="badge badge-fair">Fair</span></td>
-                <td>Moderate rehabilitation</td>
-              </tr>
-              <tr class="poor">
-                <td>25-50</td>
-                <td><span class="badge badge-poor">Poor</span></td>
-                <td>Major rehabilitation</td>
-              </tr>
-              <tr class="very-poor">
-                <td>10-25</td>
-                <td><span class="badge badge-very-poor">Very Poor</span></td>
-                <td>Reconstruction needed</td>
-              </tr>
-              <tr class="failed">
-                <td>0-10</td>
-                <td>
-                  <span class="badge badge-failed">Failed Condition</span>
-                </td>
-                <td>Immediate reconstruction</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
+    const colorPalette = [
+      "#3498db", // Blue
+      "#e74c3c", // Red
+      "#2ecc71", // Green
+      "#f39c12", // Orange
+      "#9b59b6", // Purple
+      "#1abc9c", // Teal
+      "#d35400", // Pumpkin
+      "#34495e", // Dark blue
+      "#27ae60", // Dark green
+      "#c0392b", // Dark red
+    ];
 
-    <script>
-      let roads = [];
-      let pciLineChart = null;
-      let pciBarChart = null;
+    const conditions = [
+      "Very Good",
+      "Good",
+      "Fair",
+      "Poor",
+      "Very Poor",
+      "Failed",
+    ];
 
-      // Dataset mapping based on the provided CSV
-      const pciDataset = {
-        // Key format: "PCI_2019-PCI_2021"
-        "4-4": {
-          2023: 56.32,
-          2025: 42.58,
-          2027: 31.08,
-          2029: 22.84,
-          2031: 17.49,
-        },
-        "3-3": {
-          2023: 40.74,
-          2025: 28.94,
-          2027: 21.03,
-          2029: 16.2,
-          2031: 13.4,
-        },
-        "4-3": {
-          2023: 40.74,
-          2025: 28.94,
-          2027: 21.03,
-          2029: 16.2,
-          2031: 13.4,
-        },
-        "5-5": {
-          2023: 68.35,
-          2025: 54.04,
-          2027: 40.73,
-          2029: 29.91,
-          2031: 22.18,
-        },
-        "5-4": {
-          2023: 56.32,
-          2025: 42.58,
-          2027: 31.08,
-          2029: 22.84,
-          2031: 17.49,
-        },
-        "2-1": { 2023: 10.0, 2025: 10.0, 2027: 10.0, 2029: 10.0, 2031: 10.0 },
-        "3-2": {
-          2023: 18.37,
-          2025: 13.51,
-          2027: 11.47,
-          2029: 10.61,
-          2031: 10.26,
-        },
-        "1-1": { 2023: 10.0, 2025: 10.0, 2027: 10.0, 2029: 10.0, 2031: 10.0 },
-        "2-2": {
-          2023: 18.37,
-          2025: 13.51,
-          2027: 11.47,
-          2029: 10.61,
-          2031: 10.26,
-        },
+    const conditionColors = {
+      "Very Good": "#2ecc71",
+      Good: "#27ae60",
+      Fair: "#f39c12",
+      Poor: "#e74c3c",
+      "Very Poor": "#c0392b",
+      Failed: "#7f8c8d",
+    };
+
+    // Prepare pie chart data for each year
+    const pieCharts = results.years.map((year, index) => {
+      const conditionCounts = {};
+      const conditionRoads = {};
+
+      conditions.forEach((condition) => {
+        conditionCounts[condition] = 0;
+        conditionRoads[condition] = [];
+      });
+
+      results.roads.forEach((road) => {
+        const condition = road.projections[year].condition;
+        conditionCounts[condition]++;
+        conditionRoads[condition].push(road.name);
+      });
+
+      return {
+        year,
+        data: conditions
+          .filter((condition) => conditionCounts[condition] > 0)
+          .map((condition) => ({
+            name: condition,
+            population: conditionCounts[condition],
+            color: conditionColors[condition],
+            legendFontColor: "#f8f9fa",
+            legendFontSize: 12,
+            legendFontWeight: "bold",
+          })),
+        conditionRoads,
       };
+    });
 
-      function createRoadForms() {
-        const numRoads = parseInt(document.getElementById("numRoads").value);
-        if (isNaN(numRoads) || numRoads < 1) {
-          alert("Please enter a valid number of roads (at least 1)");
-          return;
-        }
+    // Initialize pie chart refs
+    pieChartRefs.current = Array(pieCharts.length)
+      .fill()
+      .map((_, i) => pieChartRefs.current[i] || React.createRef());
 
-        const container = document.getElementById("roadFormsContainer");
-        container.innerHTML = "";
+    // Split roads into chunks for line charts
+    const roadChunks = [];
+    for (let i = 0; i < results.roads.length; i += MAX_ROADS_PER_CHART) {
+      roadChunks.push(results.roads.slice(i, i + MAX_ROADS_PER_CHART));
+    }
 
-        for (let i = 0; i < numRoads; i++) {
-          const roadForm = document.createElement("div");
-          roadForm.className = "road-form";
-          roadForm.innerHTML = `
-            <h3>Road ${i + 1} Details</h3>
-            <div class="form-group">
-              <label for="roadName${i}">Road Name:</label>
-              <input type="text" id="roadName${i}" required aria-label="Road name for road ${
-            i + 1
-          }">
-            </div>
-            <div class="form-group">
-              <label for="pci2019_${i}">PCI value in 2019 (1-5):</label>
-              <input type="number" id="pci2019_${i}" min="1" max="5" required aria-label="PCI value in 2019 for road ${
-            i + 1
-          }">
-            </div>
-            <div class="form-group">
-              <label for="pci2021_${i}">PCI value in 2021 (1-5):</label>
-              <input type="number" id="pci2021_${i}" min="1" max="5" required aria-label="PCI value in 2021 for road ${
-            i + 1
-          }">
-            </div>
-          `;
-          container.appendChild(roadForm);
-        }
+    // Initialize line chart refs
+    lineChartRefs.current = Array(roadChunks.length)
+      .fill()
+      .map((_, i) => lineChartRefs.current[i] || React.createRef());
 
-        document.getElementById("analyzeBtn").classList.remove("hidden");
-      }
+    return (
+      <Animated.ScrollView
+        ref={resultsScrollViewRef}
+        contentContainerStyle={[styles.scrollContainer, { paddingBottom: 30 }]}
+        showsVerticalScrollIndicator={true}
+        scrollEventThrottle={16}
+        style={{
+          opacity: fadeAnim,
+          transform: [{ translateY: slideAnim }],
+        }}
+        indicatorStyle="white"
+        scrollIndicatorInsets={{ right: 1 }}
+        onScroll={handleScroll}
+      >
+        <View style={styles.paddedContent}>
+          <View style={styles.resultsSection}>
+            <View style={styles.card}>
+              <Text style={[styles.cardTitle, { color: colors.accent }]}>
+                Analysis Results
+              </Text>
+              <Text style={styles.userInfoText}>
+                Analyst: {userName} | Years: {year1} and {year2}
+              </Text>
 
-      function showLoading() {
-        const overlay = document.createElement("div");
-        overlay.className = "loading-overlay";
-        overlay.innerHTML = `
-          <div class="loading-content">
-            <div class="spinner"></div>
-            <p>Analyzing road data...</p>
-          </div>
-        `;
-        document.body.appendChild(overlay);
-        return overlay;
-      }
+              <CustomScrollView
+                horizontal
+                showsHorizontalScrollIndicator={true}
+                scrollEventThrottle={16}
+                indicatorStyle="white"
+                scrollIndicatorInsets={{ right: 1 }}
+              >
+                <View style={styles.table}>
+                  <View style={styles.tableHeader}>
+                    <Text style={[styles.tableHeaderText, { width: 100 }]}>
+                      Road Name
+                    </Text>
+                    <Text style={[styles.tableHeaderText, { width: 100 }]}>
+                      PCI {year2}
+                    </Text>
+                    {results.years.map((year) => (
+                      <Text
+                        key={year}
+                        style={[styles.tableHeaderText, { width: 120 }]}
+                      >
+                        PCI {year}
+                      </Text>
+                    ))}
+                  </View>
 
-      function hideLoading(overlay) {
-        if (overlay && overlay.parentNode) {
-          overlay.parentNode.removeChild(overlay);
-        }
-      }
+                  {results.roads.map((road) => (
+                    <View key={road.name} style={styles.tableRow}>
+                      <Text
+                        style={[
+                          styles.tableCell,
+                          { width: 120, fontWeight: "bold" },
+                        ]}
+                      >
+                        {road.name}
+                      </Text>
+                      <Text style={[styles.tableCell, { width: 80 }]}>
+                        {road.pci_year2}
+                      </Text>
+                      {results.years.map((year) => {
+                        const condition = road.projections[year].condition;
+                        const badgeStyle = getBadgeStyle(condition);
+                        return (
+                          <View
+                            key={year}
+                            style={[styles.tableCell, { width: 120 }]}
+                          >
+                            <Text>
+                              {road.projections[year].pci.toFixed(2)}{" "}
+                            </Text>
+                            <View style={[styles.badge, badgeStyle]}>
+                              <Text style={styles.badgeText}>{condition}</Text>
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  ))}
+                </View>
+              </CustomScrollView>
 
-      async function analyzeRoads() {
-        const numRoads = parseInt(document.getElementById("numRoads").value);
-        roads = [];
+              <View style={styles.resultsActions}>
+                <TouchableOpacity
+                  style={styles.button}
+                  onPress={downloadCSV}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.buttonText, { color: colors.accent }]}>
+                    Download Results as CSV
+                  </Text>
+                </TouchableOpacity>
 
-        // Validate all inputs first
-        for (let i = 0; i < numRoads; i++) {
-          const roadName = document.getElementById(`roadName${i}`).value.trim();
-          const pci2019 = parseInt(
-            document.getElementById(`pci2019_${i}`).value
-          );
-          const pci2021 = parseInt(
-            document.getElementById(`pci2021_${i}`).value
-          );
+                <TouchableOpacity
+                  style={[styles.button, styles.toggleChartButton]}
+                  onPress={() => setShowLineCharts(!showLineCharts)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.buttonText}>
+                    {showLineCharts ? "Hide Line Charts" : "Show Line Charts"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
 
-          if (!roadName || isNaN(pci2019)) {
-            alert(
-              `Please enter a valid road name and PCI 2019 value for Road ${
-                i + 1
-              }`
-            );
-            return;
-          }
+            <View style={styles.chartsContainer}>
+              {/* Improved Line Charts */}
+              {showLineCharts && (
+                <>
+                  {roadChunks.map((chunk, chunkIndex) => {
+                    const dataGroups = {};
+                    chunk.forEach((road) => {
+                      const dataKey = [
+                        road.pci_year2 * 20,
+                        ...results.years.map((year) =>
+                          road.projections[year].pci.toFixed(2)
+                        ),
+                      ].join("|");
 
-          if (isNaN(pci2021)) {
-            alert(`Please enter a valid PCI 2021 value for Road ${i + 1}`);
-            return;
-          }
+                      if (!dataGroups[dataKey]) {
+                        dataGroups[dataKey] = {
+                          roads: [road.name],
+                          data: [
+                            road.pci_year2 * 20,
+                            ...results.years.map(
+                              (year) => road.projections[year].pci
+                            ),
+                          ],
+                        };
+                      } else {
+                        dataGroups[dataKey].roads.push(road.name);
+                      }
+                    });
 
-          if (pci2019 < 1 || pci2019 > 5 || pci2021 < 1 || pci2021 > 5) {
-            alert(`PCI values must be between 1 and 5 for Road ${i + 1}`);
-            return;
-          }
+                    const groupedData = Object.values(dataGroups);
 
-          roads.push({
-            name: roadName,
-            pci_2019: pci2019,
-            pci_2021: pci2021,
-          });
-        }
+                    const lineChartData = {
+                      labels: [year2, ...results.years],
+                      datasets: groupedData.map((group, index) => ({
+                        data: group.data,
+                        color: () => colorPalette[index % colorPalette.length],
+                        strokeWidth: 3,
+                      })),
+                    };
 
-        const loadingOverlay = showLoading();
+                    return (
+                      <View key={chunkIndex} style={styles.chartCard}>
+                        <Text style={styles.chartTitle}>
+                          PCI Trend Projection ({chunkIndex + 1}/
+                          {roadChunks.length})
+                        </Text>
 
-        // Simulate processing time (remove in production)
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+                        <ViewShot
+                          ref={lineChartRefs.current[chunkIndex]}
+                          options={{ format: "jpg", quality: 0.9 }}
+                        >
+                          <View>
+                            {/* X-axis Label (Years) - wrapped in Text */}
+                            <Text style={styles.axisLabelX}>Years</Text>
 
-        const results = predictPCIs(roads);
-        displayResults(results);
-        document.getElementById("resultsSection").classList.remove("hidden");
-        hideLoading(loadingOverlay);
+                            <LineChart
+                              data={lineChartData}
+                              width={screenWidth - 60}
+                              height={300}
+                              chartConfig={{
+                                backgroundColor: "#ffffff",
+                                backgroundGradientFrom: "#ffffff",
+                                backgroundGradientTo: "#ffffff",
+                                decimalPlaces: 1,
+                                color: (opacity = 1) =>
+                                  `rgba(0, 0, 0, ${opacity})`,
+                                labelColor: (opacity = 1) =>
+                                  `rgba(0, 0, 0, ${opacity})`,
+                                style: {
+                                  borderRadius: 8,
+                                },
+                                propsForDots: {
+                                  r: "6",
+                                  strokeWidth: "2",
+                                  stroke: "#ffffff",
+                                },
+                                propsForBackgroundLines: {
+                                  strokeWidth: 1,
+                                  strokeDasharray: "",
+                                },
+                                propsForLabels: {
+                                  fontSize: 12,
+                                  fontWeight: "bold",
+                                },
+                              }}
+                              bezier
+                              style={{
+                                marginVertical: 8,
+                                borderRadius: 8,
+                                paddingRight: 48,
+                              }}
+                              withVerticalLines={true}
+                              withHorizontalLines={true}
+                              withVerticalLabels={true}
+                              withHorizontalLabels={true}
+                              fromZero={false}
+                              segments={5}
+                              formatYLabel={(value) => Math.round(value)}
+                              yLabelsOffset={10}
+                              xLabelsOffset={-5}
+                              yAxisInterval={1}
+                              withInnerLines={true}
+                              withOuterLines={true}
+                              withShadow={false}
+                              getDotColor={(dataPoint, dataPointIndex) => {
+                                return colorPalette[
+                                  dataPoint.datasetIndex % colorPalette.length
+                                ];
+                              }}
+                            />
 
-        // Scroll to results
-        document
-          .getElementById("resultsSection")
-          .scrollIntoView({ behavior: "smooth" });
-      }
+                            {/* Y-axis Label (PCI) - Rotated 90 degrees and properly wrapped */}
+                            <View style={styles.axisLabelYContainer}>
+                              <Text style={styles.axisLabelY}>PCI</Text>
+                            </View>
+                          </View>
+                        </ViewShot>
 
-      function predictPCIs(roads) {
-        const predictionYears = [2023, 2025, 2027, 2029, 2031];
+                        <View style={styles.legendContainer}>
+                          {groupedData.map((group, index) => (
+                            <View key={index} style={styles.legendItem}>
+                              <View
+                                style={[
+                                  styles.legendColor,
+                                  {
+                                    backgroundColor:
+                                      colorPalette[index % colorPalette.length],
+                                  },
+                                ]}
+                              />
+                              <Text style={styles.legendText}>
+                                {group.roads.join(", ")}
+                              </Text>
+                            </View>
+                          ))}
+                        </View>
 
-        return {
-          roads: roads.map((road) => {
-            const key = `${road.pci_2019}-${road.pci_2021}`;
-            const predictions =
-              pciDataset[key] || getDefaultPrediction(road.pci_2021);
+                        <TouchableOpacity
+                          style={styles.downloadButton}
+                          onPress={() => {
+                            captureAndShareGraph(
+                              lineChartRefs.current[chunkIndex],
+                              `PCI Trend Chart ${chunkIndex + 1}`
+                            );
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          <FontAwesome
+                            name="download"
+                            size={16}
+                            color="#f5b301"
+                          />
+                          <Text style={styles.downloadButtonText}>
+                            Save Chart
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  })}
+                </>
+              )}
 
-            return {
-              name: road.name,
-              pci_2021: road.pci_2021,
-              projections: Object.fromEntries(
-                predictionYears.map((year) => [
-                  year,
+              {/* Pie Charts for Each Year */}
+              <View style={styles.card}>
+                <Text style={[styles.cardTitle, { color: colors.accent }]}>
+                  Condition Distribution by Year
+                </Text>
+
+                <CustomScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={true}
+                  scrollEventThrottle={16}
+                  indicatorStyle="white"
+                  scrollIndicatorInsets={{ right: 1 }}
+                >
+                  {pieCharts.map((chartData, index) => (
+                    <View key={index} style={styles.pieChartContainer}>
+                      <ViewShot
+                        ref={pieChartRefs.current[index]}
+                        options={{ format: "jpg", quality: 0.9 }}
+                      >
+                        {chartData.data.length > 0 ? (
+                          <View style={{ alignItems: "center" }}>
+                            <Text style={styles.pieChartTitle}>
+                              {chartData.year}
+                            </Text>
+                            <PieChart
+                              data={chartData.data}
+                              width={Math.min(screenWidth - 60, 350)}
+                              height={220}
+                              chartConfig={{
+                                backgroundColor: colors.white,
+                                backgroundGradientFrom: colors.white,
+                                backgroundGradientTo: colors.white,
+                                color: (opacity = 1) =>
+                                  `rgba(0, 0, 0, ${opacity})`,
+                              }}
+                              accessor="population"
+                              backgroundColor="transparent"
+                              paddingLeft="15"
+                              absolute
+                              hasLegend={true}
+                            />
+                          </View>
+                        ) : (
+                          <Text style={styles.noDataText}>
+                            No data available for {chartData.year}
+                          </Text>
+                        )}
+                      </ViewShot>
+
+                      <TouchableOpacity
+                        style={styles.toggleButton}
+                        onPress={() => {
+                          setSelectedChartData(chartData);
+                          setShowConditionModal(true);
+                          animateModal(true);
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={styles.toggleButtonText}>
+                          ⓘ Show Road Details
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.downloadButton}
+                        onPress={() =>
+                          captureAndShareGraph(
+                            pieChartRefs.current[index],
+                            `Condition Distribution ${chartData.year}`
+                          )
+                        }
+                        activeOpacity={0.7}
+                      >
+                        <FontAwesome
+                          name="download"
+                          size={16}
+                          color="#f5b301"
+                        />
+                        <Text style={styles.downloadButtonText}>
+                          Download as Image
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </CustomScrollView>
+              </View>
+            </View>
+
+            <View style={styles.card}>
+              <Text style={[styles.cardTitle, { color: colors.accent }]}>
+                PCI Condition Guide
+              </Text>
+              <CustomScrollView
+                horizontal
+                showsHorizontalScrollIndicator={true}
+                scrollEventThrottle={16}
+                indicatorStyle="white"
+                scrollIndicatorInsets={{ right: 1 }}
+              >
+                <View
+                  style={{
+                    borderRadius: 10,
+                    overflow: "hidden",
+                    width: "100%",
+                  }}
+                >
+                  <View style={styles.tableHeader}>
+                    <Text style={[styles.tableHeaderText, { width: 100 }]}>
+                      PCI Range
+                    </Text>
+                    <Text style={[styles.tableHeaderText, { width: 100 }]}>
+                      Condition
+                    </Text>
+                    <Text style={[styles.tableHeaderText, { width: 200 }]}>
+                      Recommended Action
+                    </Text>
+                  </View>
+
+                  {[
+                    {
+                      range: "85-100",
+                      condition: "Very Good",
+                      action: "Preventive maintenance only",
+                      style: styles.veryGood,
+                    },
+                    {
+                      range: "65-85",
+                      condition: "Good",
+                      action: "Minor rehabilitation",
+                      style: styles.good,
+                    },
+                    {
+                      range: "50-65",
+                      condition: "Fair",
+                      action: "Moderate rehabilitation",
+                      style: styles.fair,
+                    },
+                    {
+                      range: "25-50",
+                      condition: "Poor",
+                      action: "Major rehabilitation",
+                      style: styles.poor,
+                    },
+                    {
+                      range: "10-25",
+                      condition: "Very Poor",
+                      action: "Reconstruction needed",
+                      style: styles.veryPoor,
+                    },
+                    {
+                      range: "0-10",
+                      condition: "Failed",
+                      action: "Immediate reconstruction",
+                      style: styles.failed,
+                    },
+                  ].map((item, index) => (
+                    <View key={index} style={[styles.tableRow, item.style]}>
+                      <Text
+                        style={[
+                          styles.tableCell,
+                          { width: 100, color: "#f8f9fa", fontWeight: "bold" },
+                        ]}
+                      >
+                        {item.range}
+                      </Text>
+                      <View style={[styles.tableCell, { width: 100 }]}>
+                        <View
+                          style={[styles.badge, getBadgeStyle(item.condition)]}
+                        >
+                          <Text style={styles.badgeText}>{item.condition}</Text>
+                        </View>
+                      </View>
+                      <Text
+                        style={[
+                          styles.tableCell,
+                          { width: 200, color: "#f8f9fa", fontWeight: "bold" },
+                        ]}
+                      >
+                        {item.action}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </CustomScrollView>
+            </View>
+          </View>
+        </View>
+      </Animated.ScrollView>
+    );
+  };
+
+  return (
+    <View style={styles.container}>
+      <StatusBar backgroundColor={colors.primary} />
+      <ImageBackground
+        source={require("./assets/img1.jpg")}
+        style={styles.backgroundImage}
+        resizeMode="cover"
+      >
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => {
+              if (currentScreen === "results") {
+                setCurrentScreen("input");
+              } else if (currentScreen === "input") {
+                setCurrentScreen("userInfo");
+              } else {
+                navigation.goBack();
+              }
+            }}
+            style={styles.menuButton}
+            activeOpacity={0.7}
+          >
+            <FontAwesome name="arrow-left" size={24} color="#f5b301" />
+          </TouchableOpacity>
+          <View style={[styles.headerContent, { paddingRight: 20 }]}>
+            <Text style={styles.headerTitle}>
+              {currentScreen === "userInfo"
+                ? "User Information"
+                : currentScreen === "input"
+                ? "Calculate PCI"
+                : "Analysis Results"}
+            </Text>
+          </View>
+        </View>
+
+        {currentScreen === "userInfo"
+          ? renderUserInfoScreen()
+          : currentScreen === "input"
+          ? renderInputScreen()
+          : renderResultsScreen()}
+
+        {/* Floating Scroll Down Button */}
+        {(currentScreen === "input" || currentScreen === "results") && (
+          <>
+            {/* Scroll Up Button */}
+            {showScrollUpButton && (
+              <Animated.View
+                style={[
+                  styles.scrollUpButton,
                   {
-                    pci: predictions[year],
-                    condition: classifyPCI(predictions[year]),
+                    opacity: scrollButtonOpacity,
+                    transform: [
+                      {
+                        translateY: scrollButtonOpacity.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [50, 0],
+                        }),
+                      },
+                    ],
+                    right: 30,
+                    bottom: 130, // Positioned above the scroll down button
                   },
-                ])
-              ),
-            };
-          }),
-          years: predictionYears,
-        };
-      }
+                ]}
+              >
+                <TouchableOpacity
+                  onPress={scrollToTop}
+                  style={styles.scrollButtonContent}
+                  activeOpacity={0.7}
+                >
+                  <FontAwesome
+                    name="arrow-up"
+                    size={20}
+                    color={colors.accent}
+                  />
+                </TouchableOpacity>
+              </Animated.View>
+            )}
 
-      function getDefaultPrediction(currentPCI) {
-        // Default prediction if no exact match found
-        // Using a simple degradation model based on the dataset patterns
-        const baseValue = currentPCI * 15; // Base value scaled by PCI
-        return {
-          2023: baseValue,
-          2025: baseValue * 0.85,
-          2027: baseValue * 0.7,
-          2029: baseValue * 0.6,
-          2031: baseValue * 0.5,
-        };
-      }
-
-      function classifyPCI(value) {
-        if (value > 85) return "Very Good";
-        if (value > 65) return "Good";
-        if (value > 50) return "Fair";
-        if (value > 25) return "Poor";
-        if (value > 10) return "Very Poor";
-        return "Failed Condition";
-      }
-
-      function displayResults(results) {
-        let tableHTML = `
-          <table>
-            <thead>
-              <tr>
-                <th>Road Name</th>
-                <th>PCI 2021</th>
-                ${results.years.map((year) => `<th>PCI ${year}</th>`).join("")}
-              </tr>
-            </thead>
-            <tbody>
-        `;
-
-        const lineChartData = {
-          labels: ["2021", ...results.years],
-          datasets: [],
-        };
-
-        const barChartData = {
-          labels: results.roads.map((road) => road.name),
-          datasets: results.years.map((year) => {
-            return {
-              label: year,
-              data: results.roads.map((road) => road.projections[year].pci),
-              backgroundColor: getRandomColor(),
-            };
-          }),
-        };
-
-        results.roads.forEach((road) => {
-          tableHTML += `
-            <tr>
-              <td><strong>${road.name}</strong></td>
-              <td>${road.pci_2021}</td>
-              ${results.years
-                .map((year) => {
-                  const condition = road.projections[year].condition;
-                  const badgeClass = getBadgeClass(condition);
-                  return `<td>${road.projections[year].pci.toFixed(
-                    2
-                  )} <span class="badge ${badgeClass}">${condition}</span></td>`;
-                })
-                .join("")}
-            </tr>
-          `;
-
-          lineChartData.datasets.push({
-            label: road.name,
-            data: [
-              road.pci_2021 * 20,
-              ...results.years.map((year) => road.projections[year].pci),
-            ],
-            borderWidth: 2,
-            fill: false,
-            tension: 0.1,
-            backgroundColor: getRandomColor(),
-            borderColor: getRandomColor(),
-          });
-        });
-
-        tableHTML += `
-            </tbody>
-          </table>
-        `;
-
-        document.getElementById("resultsTable").innerHTML = tableHTML;
-
-        // Destroy previous charts if they exist
-        if (pciLineChart) {
-          pciLineChart.destroy();
-        }
-        if (pciBarChart) {
-          pciBarChart.destroy();
-        }
-
-        // Create new charts
-        const lineCtx = document
-          .getElementById("pciLineChart")
-          .getContext("2d");
-        const barCtx = document.getElementById("pciBarChart").getContext("2d");
-
-        pciLineChart = new Chart(lineCtx, {
-          type: "line",
-          data: lineChartData,
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-              y: {
-                beginAtZero: false,
-                title: {
-                  display: true,
-                  text: "PCI Value",
+            {/* Scroll Down Button */}
+            <Animated.View
+              style={[
+                styles.scrollDownButton,
+                {
+                  opacity: scrollButtonOpacity,
+                  transform: [
+                    {
+                      translateY: scrollButtonOpacity.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [50, 0],
+                      }),
+                    },
+                  ],
+                  right: 30,
                 },
-                min: 0,
-                max: 100,
-              },
-              x: {
-                title: {
-                  display: true,
-                  text: "Year",
-                },
-              },
-            },
-            plugins: {
-              title: {
-                display: true,
-                text: "Road PCI Projections Over Time",
-              },
-              tooltip: {
-                callbacks: {
-                  label: function (context) {
-                    const roadName = context.dataset.label;
-                    let year, condition;
+              ]}
+            >
+              <TouchableOpacity
+                onPress={scrollToBottom}
+                style={styles.scrollButtonContent}
+                activeOpacity={0.7}
+              >
+                <FontAwesome
+                  name="arrow-down"
+                  size={20}
+                  color={colors.accent}
+                />
+              </TouchableOpacity>
+            </Animated.View>
+          </>
+        )}
 
-                    if (context.label === "2021") {
-                      year = 2021;
-                      condition = classifyPCI(context.parsed.y);
-                    } else {
-                      year = context.label;
-                      condition = results.roads.find((r) => r.name === roadName)
-                        .projections[year].condition;
-                    }
-                    return `${roadName}: ${context.parsed.y.toFixed(
-                      2
-                    )} (${condition})`;
-                  },
-                },
-              },
-            },
-          },
-        });
+        {/* Condition Details Modal */}
+        <Modal
+          visible={showConditionModal}
+          animationType="fade"
+          transparent={true}
+          onRequestClose={() => {
+            animateModal(false);
+            setTimeout(() => setShowConditionModal(false), 300);
+          }}
+          onShow={() => animateModal(true)}
+        >
+          <View style={styles.modalOverlay}>
+            <Animated.View
+              style={[
+                styles.modalContent,
+                { transform: [{ translateY: modalSlideAnim }] },
+              ]}
+            >
+              <Text style={styles.modalTitle}>
+                Condition Breakdown - {selectedChartData?.year}
+              </Text>
 
-        pciBarChart = new Chart(barCtx, {
-          type: "bar",
-          data: barChartData,
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-              y: {
-                beginAtZero: false,
-                title: {
-                  display: true,
-                  text: "PCI Value",
-                },
-                min: 0,
-                max: 100,
-              },
-              x: {
-                title: {
-                  display: true,
-                  text: "Road Name",
-                },
-              },
-            },
-            plugins: {
-              title: {
-                display: true,
-                text: "PCI Values by Road and Year",
-              },
-              tooltip: {
-                callbacks: {
-                  label: function (context) {
-                    const year = context.dataset.label;
-                    const roadName = barChartData.labels[context.dataIndex];
-                    const condition = results.roads.find(
-                      (r) => r.name === roadName
-                    ).projections[year].condition;
-                    return `${year}: ${context.parsed.y.toFixed(
-                      2
-                    )} (${condition})`;
-                  },
-                },
-              },
-            },
-          },
-        });
-      }
+              <ScrollView
+                style={styles.modalScrollView}
+                showsVerticalScrollIndicator={false}
+                scrollEventThrottle={16}
+              >
+                {selectedChartData?.conditionRoads &&
+                  Object.entries(selectedChartData.conditionRoads)
+                    .filter(([condition, roads]) => roads.length > 0)
+                    .map(([condition, roads]) => {
+                      const backgroundColor =
+                        getConditionBackgroundColor(condition);
 
-      function getBadgeClass(condition) {
-        switch (condition) {
-          case "Very Good":
-            return "badge-very-good";
-          case "Good":
-            return "badge-good";
-          case "Fair":
-            return "badge-fair";
-          case "Poor":
-            return "badge-poor";
-          case "Very Poor":
-            return "badge-very-poor";
-          case "Failed Condition":
-            return "badge-failed";
-          default:
-            return "";
-        }
-      }
+                      return (
+                        <View
+                          key={condition}
+                          style={styles.modalConditionGroup}
+                        >
+                          <View
+                            style={[
+                              styles.modalConditionHeader,
+                              { backgroundColor },
+                            ]}
+                          >
+                            <Text style={styles.modalConditionTitle}>
+                              {condition} ({roads.length})
+                            </Text>
+                          </View>
 
-      function getRandomColor() {
-        const colors = [
-          "#1E2328",
-          "#2A2E34",
-          "#3B3F46",
-          "#52575D",
-          "#F5B301",
-          "#FED053",
-          "#1E2328",
-          "#2A2E34",
-        ];
-        return colors[Math.floor(Math.random() * colors.length)];
-      }
+                          <View style={styles.modalRoadListScroll}>
+                            <View style={styles.modalRoadList}>
+                              {roads.map((road, idx) => (
+                                <Text
+                                  key={idx}
+                                  style={styles.modalRoadListItem}
+                                >
+                                  ✦ {road}
+                                </Text>
+                              ))}
+                            </View>
+                          </View>
+                        </View>
+                      );
+                    })}
+              </ScrollView>
 
-      function downloadCSV() {
-        const table = document.getElementById("resultsTable");
-        const rows = table.querySelectorAll("tr");
-        let csvContent = "data:text/csv;charset=utf-8,";
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => {
+                  animateModal(false);
+                  setTimeout(() => setShowConditionModal(false), 300);
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.modalCloseButtonText}>Close</Text>
+              </TouchableOpacity>
+            </Animated.View>
+          </View>
+        </Modal>
 
-        // Add headers
-        const headers = [];
-        rows[0].querySelectorAll("th").forEach((header) => {
-          headers.push(header.textContent);
-        });
-        csvContent += headers.join(",") + "\n";
+        {/* Excel File Selection Loading Modal */}
+        <Modal visible={excelSelectLoading} transparent>
+          <View style={styles.loadingOverlay}>
+            <View style={styles.loadingContent}>
+              <ActivityIndicator size="large" color={colors.accent} />
+              <Text style={styles.loadingText}>Selecting file...</Text>
+            </View>
+          </View>
+        </Modal>
 
-        // Add data rows
-        for (let i = 1; i < rows.length; i++) {
-          const row = [];
-          rows[i].querySelectorAll("td").forEach((cell) => {
-            // Remove the badge span content and just keep the numeric value
-            const text = cell.textContent.replace(/\s*\(.*?\)\s*/g, "").trim();
-            row.push(text);
-          });
-          csvContent += row.join(",") + "\n";
-        }
+        {/* Excel Processing Loading Modal */}
+        <Modal visible={excelLoading} transparent>
+          <View style={styles.loadingOverlay}>
+            <View style={styles.loadingContent}>
+              <ActivityIndicator size="large" color={colors.accent} />
+              <Text style={styles.loadingText}>Processing Excel file...</Text>
+            </View>
+          </View>
+        </Modal>
 
-        // Create download link
-        const encodedUri = encodeURI(csvContent);
-        const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", "rural_roads_pci_analysis.csv");
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      }
-      // Mobile menu functionality
-      const mobileMenuBtn = document.getElementById("mobileMenuBtn");
-      const sidebar = document.getElementById("sidebar");
-      const closeSidebar = document.getElementById("closeSidebar");
-      const overlay = document.getElementById("overlay");
+        {/* Analysis Loading Modal */}
+        <Modal visible={loading} transparent>
+          <View style={styles.loadingOverlay}>
+            <View style={styles.loadingContent}>
+              <ActivityIndicator size="large" color={colors.accent} />
+              <Text style={styles.loadingText}>Analyzing road data...</Text>
+            </View>
+          </View>
+        </Modal>
+      </ImageBackground>
+    </View>
+  );
+};
 
-      mobileMenuBtn.addEventListener("click", () => {
-        sidebar.classList.add("open");
-        overlay.classList.add("active");
-      });
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  backgroundImage: {
+    flex: 1,
+    width: "100%",
+    height: "100%",
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    backgroundColor: colors.primary,
+    zIndex: 1,
+  },
+  menuButton: {
+    padding: 5,
+  },
+  headerContent: {
+    flex: 1,
+    alignItems: "center",
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#f8f9fa",
+  },
+  scrollContainer: {
+    flexGrow: 1,
+  },
+  paddedContent: {
+    paddingHorizontal: 15,
+  },
+  userInfoContainer: {
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: 20,
+  },
+  userInfoText: {
+    fontSize: 14,
+    color: colors.accentLight,
+    marginBottom: 15,
+    textAlign: "center",
+    fontStyle: "italic",
+  },
+  card: {
+    backgroundColor: "rgba(37, 42, 50, 0.9)",
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: "#252a32",
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginBottom: 15,
+    textAlign: "center",
+  },
+  formGroup: {
+    marginBottom: 15,
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: "500",
+    marginBottom: 8,
+    color: "#f8f9fa",
+  },
+  input: {
+    backgroundColor: "#ffffff",
+    borderWidth: 2,
+    borderColor: "rgba(54, 63, 77, 1)",
+    borderRadius: 6,
+    padding: 12,
+    fontSize: 16,
+    color: "#1e2328",
+  },
+  excelButton: {
+    backgroundColor: "#21a366",
+    borderRadius: 6,
+    padding: 12,
+    alignItems: "center",
+    marginBottom: 5,
+    justifyContent: "center",
+    minHeight: 44,
+  },
+  excelButtonText: {
+    color: "#ffffff",
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  helperText: {
+    fontSize: 12,
+    color: "#dadadaff",
+    fontStyle: "italic",
+    marginTop: 5,
+    marginBottom: 10,
+  },
+  divider: {
+    height: 2,
+    backgroundColor: "#f5b301",
+    marginVertical: 15,
+  },
+  button: {
+    backgroundColor: "rgba(54, 63, 77, 1)",
+    borderRadius: 6,
+    padding: 12,
+    alignItems: "center",
+    marginBottom: 15,
+    borderColor: colors.accent,
+    borderWidth: 2,
+  },
+  toggleChartButton: {
+    backgroundColor: colors.accent,
+    width: "58%",
+    borderRadius: 6,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    alignItems: "center",
+    shadowColor: colors.accent,
+    shadowOffset: {
+      width: 0,
+      height: 5,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 15,
+    elevation: 5,
+  },
+  buttonText: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: "bold",
+  },
+  roadForm: {
+    backgroundColor: "rgba(26, 30, 35, 0.7)",
+    borderRadius: 8,
+    padding: 15,
+    marginBottom: 15,
+    borderLeftWidth: 4,
+    borderLeftColor: "#f5b301",
+  },
+  resultsSection: {
+    marginTop: 20,
+  },
+  resultsActions: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
+    flexWrap: "wrap",
+  },
+  tableHeader: {
+    flexDirection: "row",
+    backgroundColor: "#ffbf5c",
+    padding: 10,
+  },
+  tableHeaderText: {
+    fontWeight: "600",
+    color: "#1e2328",
+    fontSize: 14,
+    textTransform: "uppercase",
+  },
+  tableRow: {
+    backgroundColor: "#f8f9fa",
+    flexDirection: "row",
+    padding: 10,
+    borderColor: "#1e2328",
+    borderBottomWidth: 1,
+    overflow: "hidden",
+    borderBottomColor: "#ffbf5c",
+  },
+  tableCell: {
+    padding: 5,
+    justifyContent: "center",
+  },
+  table: {
+    borderColor: "#ffbf5c",
+    borderWidth: 3,
+    borderRadius: 8,
+    overflow: "hidden",
+    marginBottom: 20,
+  },
+  badge: {
+    padding: 5,
+    borderRadius: 4,
+    alignSelf: "flex-start",
+  },
+  badgeText: {
+    color: "#ffffff",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  badgeVeryGood: { backgroundColor: "#2ecc71" },
+  badgeGood: { backgroundColor: "#27ae60" },
+  badgeFair: { backgroundColor: "#ffa71aff" },
+  badgePoor: { backgroundColor: "#f75644ff" },
+  badgeVeryPoor: { backgroundColor: "#ce4031ff" },
+  badgeFailed: { backgroundColor: "#919e9fff" },
+  veryGood: { backgroundColor: "rgba(40, 190, 103, 0.9)" },
+  good: { backgroundColor: "rgba(31, 138, 75, 0.9)" },
+  fair: { backgroundColor: "rgba(198, 130, 21, 0.9)" },
+  poor: { backgroundColor: "rgba(197, 66, 52, 0.9)" },
+  veryPoor: { backgroundColor: "rgba(169, 50, 37, 0.9)" },
+  failed: { backgroundColor: "rgba(107, 118, 119, 0.9)" },
+  chartsContainer: {
+    marginTop: 20,
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingContent: {
+    backgroundColor: colors.primaryDark,
+    padding: 30,
+    borderRadius: 8,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: colors.accent,
+  },
+  loadingText: {
+    marginTop: 10,
+    color: colors.white,
+  },
+  downloadButton: {
+    backgroundColor: "#3b3f46",
+    borderRadius: 6,
+    padding: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    marginTop: 10,
+    borderColor: colors.accent,
+    borderWidth: 2,
+  },
+  downloadButtonText: {
+    color: "#f5b301",
+    marginLeft: 8,
+    fontSize: 14,
+    fontWeight: "bold",
+  },
+  chartCard: {
+    backgroundColor: "rgba(37, 42, 50, 0.9)",
+    borderRadius: 12,
+    padding: 15,
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  chartTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.accent,
+    marginBottom: 15,
+    textAlign: "center",
+  },
+  legendContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    marginTop: 15,
+    marginBottom: 15,
+    alignItems: "flex-start",
+    paddingHorizontal: 15,
+  },
+  legendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginRight: 15,
+    marginBottom: 5,
+  },
+  legendColor: {
+    width: 15,
+    height: 15,
+    borderRadius: 3,
+    marginRight: 5,
+  },
+  legendText: {
+    color: colors.textLight,
+    fontSize: 12,
+  },
+  pieChartContainer: {
+    marginRight: 20,
+    alignItems: "center",
+    width: screenWidth - 60,
+  },
+  pieChartTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 10,
+    textAlign: "center",
+    color: "#f8f9fa",
+  },
+  noDataText: {
+    textAlign: "center",
+    padding: 20,
+    color: "#f8f9fa",
+    fontStyle: "italic",
+  },
+  toggleButton: {
+    padding: 10,
+    backgroundColor: colors.accent,
+    borderRadius: 5,
+    marginTop: 10,
+    alignItems: "center",
+    width: "53%",
+    shadowColor: colors.accent,
+    shadowOffset: {
+      width: 0,
+      height: 5,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 15,
+    elevation: 5,
+  },
+  toggleButtonText: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: "bold",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    backgroundColor: colors.primaryDark,
+    borderRadius: 12,
+    padding: 20,
+    width: "90%",
+    maxHeight: "80%",
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 15,
+    textAlign: "center",
+    color: colors.accent,
+  },
+  modalScrollView: {
+    maxHeight: "80%",
+  },
+  modalConditionGroup: {
+    marginBottom: 15,
+  },
+  modalConditionHeader: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    marginBottom: 5,
+  },
+  modalConditionTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#f8f9fa",
+  },
+  modalRoadListScroll: {
+    backgroundColor: "#f8e0a0ff",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    borderRadius: 6,
+    padding: 8,
+  },
+  modalRoadList: {
+    marginLeft: 10,
+  },
+  modalRoadListItem: {
+    fontSize: 14,
+    paddingVertical: 4,
+    color: colors.primaryDark,
+    fontWeight: "bold",
+  },
+  modalCloseButton: {
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderRadius: 6,
+    paddingVertical: 12,
+    top: 10,
+    paddingHorizontal: 20,
+    borderWidth: 2,
+    borderColor: colors.accent,
+  },
+  modalCloseButtonText: {
+    color: colors.accent,
+    textAlign: "center",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollViewContent: {
+    flexGrow: 1,
+  },
+  androidScrollbar: {
+    width: 1,
+    backgroundColor: colors.accent,
+    borderRadius: 3,
+  },
+  dateInput: {
+    backgroundColor: "#ffffff",
+    borderWidth: 2,
+    borderColor: "rgba(54, 63, 77, 1)",
+    borderRadius: 6,
+    padding: 12,
+    justifyContent: "center",
+  },
+  dateText: {
+    fontSize: 16,
+    color: "#1e2328",
+  },
+  placeholderText: {
+    fontSize: 16,
+    color: "#999",
+  },
+  errorText: {
+    color: "#ff4444",
+    fontSize: 14,
+    marginTop: 5,
+  },
+  axisLabelX: {
+    textAlign: "center",
+    color: "black",
+    fontWeight: "bold",
+    marginTop: 5,
+    top: 300,
+    zIndex: 1,
+  },
+  axisLabelYContainer: {
+    position: "absolute",
+    left: -40,
+    top: "50%",
+    transform: [{ rotate: "-90deg" }],
+  },
+  axisLabelY: {
+    color: "#000",
+    fontWeight: "bold",
+    width: 100,
+    textAlign: "center",
+  },
+  scrollUpButton: {
+    position: "absolute",
+    right: 20,
+    bottom: 110, // Positioned above scroll down button
+    backgroundColor: "rgba(59, 63, 70, 0.9)",
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: colors.accent,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  scrollDownButton: {
+    position: "absolute",
+    right: 20,
+    bottom: 70,
+    backgroundColor: "rgba(59, 63, 70, 0.9)",
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: colors.accent,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  scrollButtonContent: {
+    width: "100%",
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+});
 
-      closeSidebar.addEventListener("click", () => {
-        sidebar.classList.remove("open");
-        overlay.classList.remove("active");
-      });
-
-      overlay.addEventListener("click", () => {
-        sidebar.classList.remove("open");
-        overlay.classList.remove("active");
-      });
-    </script>
-  </body>
-</html>
+export default CalculatePCIScreen;
