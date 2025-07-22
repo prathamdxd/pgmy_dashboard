@@ -17,6 +17,7 @@ import { NavigationContainer } from "@react-navigation/native";
 
 import CalculatePCIScreen from "./CalculatePCIScreen";
 import ContactScreen from "./ContactScreen";
+import CalculateBudgetScreen from "./CalculateBudgetScreen";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -139,7 +140,7 @@ const App = ({ navigation }) => {
               <View style={styles.navLogoIcon}>
                 <Text style={styles.navLogoIconText}>RPM</Text>
               </View>
-              <Text style={styles.headerTitle}>Rural Roads</Text>
+              <Text style={styles.headerTitle}>SochYatra</Text>
             </View>
             <TouchableOpacity onPress={toggleSidebar} style={styles.menuButton}>
               <FontAwesome name="bars" size={24} color="#f5b301" />
@@ -174,7 +175,7 @@ const App = ({ navigation }) => {
                     <View style={styles.sidebarLogoIcon}>
                       <Text style={styles.sidebarLogoIconText}>RPM</Text>
                     </View>
-                    <Text style={styles.sidebarLogoText}>Rural Roads</Text>
+                    <Text style={styles.sidebarLogoText}>Sochyatra</Text>
                   </View>
                   <TouchableOpacity
                     onPress={toggleSidebar}
@@ -200,7 +201,13 @@ const App = ({ navigation }) => {
                   >
                     <Text style={styles.sidebarLinkText}>Calculate PCI</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.sidebarLink}>
+                  <TouchableOpacity
+                    style={styles.sidebarLink}
+                    onPress={() => {
+                      toggleSidebar();
+                      navigation.navigate("CalculateBudget");
+                    }}
+                  >
                     <Text style={styles.sidebarLinkText}>Calculate Budget</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -376,7 +383,10 @@ const App = ({ navigation }) => {
                   >
                     <Text style={styles.btnPrimaryText}>Calculate PCI</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.btnAccent}>
+                  <TouchableOpacity
+                    style={styles.btnAccent}
+                    onPress={() => navigation.navigate("CalculateBudget")}
+                  >
                     <Text style={styles.btnAccentText}>Estimate Budget</Text>
                   </TouchableOpacity>
                 </View>
@@ -760,6 +770,10 @@ const AppWrapper = () => {
         <Stack.Screen name="Home" component={App} />
         <Stack.Screen name="FAQ" component={FAQScreen} />
         <Stack.Screen name="CalculatePCI" component={CalculatePCIScreen} />
+        <Stack.Screen
+          name="CalculateBudget"
+          component={CalculateBudgetScreen}
+        />
         <Stack.Screen name="Contact" component={ContactScreen} />
       </Stack.Navigator>
     </NavigationContainer>
