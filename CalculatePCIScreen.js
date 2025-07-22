@@ -17,13 +17,15 @@ import {
   Platform,
 } from "react-native";
 import { FontAwesome } from "@expo/vector-icons";
-import { BarChart, LineChart, PieChart } from "react-native-chart-kit";
+import { PieChart } from "react-native-chart-kit";
 import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import * as DocumentPicker from "expo-document-picker";
 import * as XLSX from "xlsx";
 import ViewShot from "react-native-view-shot";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import { WebView } from "react-native-webview";
+
 const colors = {
   primary: "#1e2328",
   primaryDark: "#2a2e34",
@@ -40,19 +42,19 @@ const colors = {
 const getConditionBackgroundColor = (condition) => {
   switch (condition) {
     case "Very Good":
-      return "#2ecc71"; // Green
+      return "#2ecc71";
     case "Good":
-      return "#27ae60"; // Darker Green
+      return "#27ae60";
     case "Fair":
-      return "#f39c12"; // Orange
+      return "#f39c12";
     case "Poor":
-      return "#e74c3c"; // Red
+      return "#e74c3c";
     case "Very Poor":
-      return "#c0392b"; // Dark Red
+      return "#c0392b";
     case "Failed":
-      return "#7f8c8d"; // Gray
+      return "#7f8c8d";
     default:
-      return "#3b3f46"; // Default (secondary)
+      return "#3b3f46";
   }
 };
 
@@ -88,9 +90,10 @@ const CustomScrollView = ({ children, ...props }) => {
 };
 
 const screenWidth = Dimensions.get("window").width;
-const MAX_ROADS_PER_CHART = 5;
+const MAX_ROADS_PER_CHART = 10;
 
 const CalculatePCIScreen = ({ navigation }) => {
+  const [webViewLoaded, setWebViewLoaded] = useState(false);
   const [userName, setUserName] = useState("");
   const [year1, setYear1] = useState("");
   const [year2, setYear2] = useState("");
@@ -105,31 +108,23 @@ const CalculatePCIScreen = ({ navigation }) => {
   const [showLineCharts, setShowLineCharts] = useState(false);
   const [showConditionModal, setShowConditionModal] = useState(false);
   const [selectedChartData, setSelectedChartData] = useState(null);
+  const [showScrollButton, setShowScrollButton] = useState(false);
 
-  // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(100)).current;
   const modalSlideAnim = useRef(new Animated.Value(300)).current;
+  const scrollButtonOpacity = useRef(new Animated.Value(0)).current;
 
-  // Refs
   const resultsScrollViewRef = useRef();
   const inputScrollViewRef = useRef();
   const analyzeButtonRef = useRef();
-  const lineChartRefs = useRef([]);
   const pieChartRefs = useRef([]);
+  const lineChartRefs = useRef([]);
 
-  const [surveyDate, setSurveyDate] = useState(null); // Change from new Date() to null
+  const [surveyDate, setSurveyDate] = useState(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
-
   const [yearError, setYearError] = useState("");
-  // Add this function
-  const handleDateChange = (event, selectedDate) => {
-    setShowDatePicker(false);
-    if (selectedDate) {
-      setSurveyDate(selectedDate);
-    }
-  };
-  // PCI Dataset
+
   const pciDataset = {
     "4-4": { 2: 56.32, 4: 42.58, 6: 31.08, 8: 22.84, 10: 17.49 },
     "3-3": { 2: 40.74, 4: 28.94, 6: 21.03, 8: 16.2, 10: 13.4 },
@@ -142,7 +137,6 @@ const CalculatePCIScreen = ({ navigation }) => {
     "2-2": { 2: 18.37, 4: 13.51, 6: 11.47, 8: 10.61, 10: 10.26 },
   };
 
-  // Animate screen transitions
   useEffect(() => {
     Animated.parallel([
       Animated.timing(fadeAnim, {
@@ -159,7 +153,6 @@ const CalculatePCIScreen = ({ navigation }) => {
     ]).start();
   }, [currentScreen]);
 
-  // Scroll to top when results screen is shown
   useEffect(() => {
     if (currentScreen === "results" && resultsScrollViewRef.current) {
       setTimeout(() => {
@@ -168,9 +161,28 @@ const CalculatePCIScreen = ({ navigation }) => {
     }
   }, [currentScreen, results]);
 
-  // Scroll to analyze button after Excel upload
+  useEffect(() => {
+    if (year1 && year2) {
+      const year1Num = parseInt(year1);
+      const year2Num = parseInt(year2);
 
-  // Animate modal
+      if (year2Num !== year1Num + 2) {
+        setYearError(`Year 2 must be ${year1Num + 2}`);
+      } else {
+        setYearError("");
+      }
+    } else {
+      setYearError("");
+    }
+  }, [year1, year2]);
+
+  const handleDateChange = (event, selectedDate) => {
+    setShowDatePicker(false);
+    if (selectedDate) {
+      setSurveyDate(selectedDate);
+    }
+  };
+
   const animateModal = (show) => {
     Animated.timing(modalSlideAnim, {
       toValue: show ? 0 : 300,
@@ -179,15 +191,182 @@ const CalculatePCIScreen = ({ navigation }) => {
     }).start();
   };
 
-  // Function to capture and share graph
+  const [showScrollUpButton, setShowScrollUpButton] = useState(false);
+
+  const handleScroll = (event) => {
+    const offsetY = event.nativeEvent.contentOffset.y;
+    const contentHeight = event.nativeEvent.contentSize.height;
+    const layoutHeight = event.nativeEvent.layoutMeasurement.height;
+
+    const shouldShowDown = offsetY < contentHeight - layoutHeight - 100;
+    if (shouldShowDown !== showScrollButton) {
+      setShowScrollButton(shouldShowDown);
+      Animated.timing(scrollButtonOpacity, {
+        toValue: shouldShowDown ? 1 : 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    }
+
+    const shouldShowUp = offsetY > 100;
+    if (shouldShowUp !== showScrollUpButton) {
+      setShowScrollUpButton(shouldShowUp);
+    }
+  };
+
+  const scrollToBottom = () => {
+    const scrollView =
+      currentScreen === "input"
+        ? inputScrollViewRef.current
+        : resultsScrollViewRef.current;
+    if (scrollView) {
+      scrollView.scrollToEnd({ animated: true });
+    }
+  };
+
+  const scrollToTop = () => {
+    const scrollView =
+      currentScreen === "input"
+        ? inputScrollViewRef.current
+        : resultsScrollViewRef.current;
+    if (scrollView) {
+      scrollView.scrollTo({ y: 0, animated: true });
+    }
+  };
+
+  const generateLineChartHTML = (chartData, roadNames) => {
+    const labels = JSON.stringify(chartData.labels);
+    const datasets = JSON.stringify(
+      chartData.datasets.map((dataset, index) => ({
+        label: roadNames[index],
+        data: dataset.data,
+        borderColor: dataset.color(),
+        backgroundColor: "rgba(0, 0, 0, 0)",
+        borderWidth: 2,
+        pointRadius: 4,
+        pointBackgroundColor: dataset.color(),
+      }))
+    );
+
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+          <style>
+            body {
+              margin: 0;
+              padding: 0;
+              background-color: #ffffff;
+            }
+            .chart-container {
+              width: 100%;
+              height: 100%;
+            }
+            canvas {
+              padding: 10px 10px 5px 6px;
+              width: 100% !important;
+              height: 350px !important;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="chart-container">
+            <canvas id="lineChart"></canvas>
+          </div>
+          <script>
+            const ctx = document.getElementById('lineChart').getContext('2d');
+            new Chart(ctx, {
+              type: 'line',
+              data: {
+                labels: ${labels},
+                datasets: ${datasets}
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                  y: {
+                    beginAtZero: false,
+                    title: {
+                      display: true,
+                      text: 'PCI Value',
+                      font: {
+                        size: 14,
+                        weight: 'bold'
+                      }
+                    },
+                    ticks: {
+                      stepSize: 10,
+                      font: {
+                        size: 12
+                      }
+                    }
+                  },
+                  x: {
+                    title: {
+                      display: true,
+                      text: 'Year',
+                      font: {
+                        size: 14,
+                        weight: 'bold'
+                      }
+                    },
+                    ticks: {
+                      font: {
+                        size: 12
+                      }
+                    }
+                  }
+                },
+                plugins: {
+                  legend: {
+                    display: false
+                  },
+                  tooltip: {
+                    callbacks: {
+                      label: function() {
+                        return null;
+                      },
+                      footer: function(tooltipItems) {
+                        const index = tooltipItems[0].dataIndex;
+                        const year = tooltipItems[0].label;
+
+                        const lines = ["Year: " + year];
+                        tooltipItems.forEach(item => {
+                          const value = item.dataset.data[index];
+                          lines.push("PCI: "+value.toFixed(2));
+                        });
+
+                        return lines;
+                      }
+                    }
+                  }
+                }
+              }
+            });
+          </script>
+        </body>
+      </html>
+    `;
+  };
+
   const captureAndShareGraph = async (ref, name) => {
     try {
+      if (!webViewLoaded) {
+        Alert.alert("Please wait", "The chart is still loading");
+        return;
+      }
+
       if (ref && ref.current) {
+        // Add a small delay to ensure everything is rendered
+        await new Promise((resolve) => setTimeout(resolve, 300));
         const uri = await ref.current.capture();
         await Sharing.shareAsync(uri, {
-          mimeType: "image/jpeg",
+          mimeType: "image/png",
           dialogTitle: `Share ${name}`,
-          UTI: "public.jpeg",
+          UTI: "public.png",
         });
       }
     } catch (error) {
@@ -196,7 +375,6 @@ const CalculatePCIScreen = ({ navigation }) => {
     }
   };
 
-  // Excel Upload Handler
   const uploadExcel = async () => {
     try {
       setExcelSelectLoading(true);
@@ -236,37 +414,51 @@ const CalculatePCIScreen = ({ navigation }) => {
       const worksheet = workbook.Sheets[firstSheetName];
       const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
-      const requiredColumns = [
-        "roadname",
-        `pcivalue_${year1}`,
-        `pcivalue_${year2}`,
-      ];
-      const sampleRow = jsonData[0] || {};
-      const missingColumns = requiredColumns.filter(
-        (col) => !(col in sampleRow)
+      if (jsonData.length === 0) {
+        throw new Error("No data found in the Excel sheet");
+      }
+
+      const columnNames = Object.keys(jsonData[0] || {});
+
+      const roadNameCol = columnNames.find(
+        (col) =>
+          col.toLowerCase().includes("roadname") ||
+          col.toLowerCase().includes("road name")
       );
 
-      if (missingColumns.length > 0) {
+      const pciYear1Col = columnNames.find(
+        (col) =>
+          col.toLowerCase().includes(`pci_${year1}`) ||
+          col.toLowerCase().includes(`pci ${year1}`) ||
+          col.toLowerCase().includes(`pci${year1}`)
+      );
+
+      const pciYear2Col = columnNames.find(
+        (col) =>
+          col.toLowerCase().includes(`pci_${year2}`) ||
+          col.toLowerCase().includes(`pci ${year2}`) ||
+          col.toLowerCase().includes(`pci${year2}`)
+      );
+
+      if (!roadNameCol || !pciYear1Col || !pciYear2Col) {
         throw new Error(
-          `Missing required columns: ${missingColumns.join(", ")}`
+          `Required columns not found. Please ensure your Excel file has columns for:
+          - Road name (e.g., "roadname")
+          - PCI ${year1} (e.g., "pci_${year1}")
+          - PCI ${year2} (e.g., "pci_${year2}")`
         );
       }
 
       const forms = jsonData.map((item, index) => ({
         id: index,
-        roadName: item.roadname || "",
-        pciYear1: item[`pcivalue_${year1}`]
-          ? item[`pcivalue_${year1}`].toString()
-          : "",
-        pciYear2: item[`pcivalue_${year2}`]
-          ? item[`pcivalue_${year2}`].toString()
-          : "",
+        roadName: item[roadNameCol]?.toString() || "",
+        pciYear1: item[pciYear1Col]?.toString() || "",
+        pciYear2: item[pciYear2Col]?.toString() || "",
       }));
 
       setRoadForms(forms);
       setNumRoads(forms.length.toString());
 
-      // Scroll to analyze button only after Excel upload
       if (inputScrollViewRef.current) {
         setTimeout(() => {
           inputScrollViewRef.current.scrollToEnd({ animated: true });
@@ -301,8 +493,6 @@ const CalculatePCIScreen = ({ navigation }) => {
     }
 
     setRoadForms(forms);
-
-    // No scrolling here
   };
 
   const handleRoadInputChange = (index, field, value) => {
@@ -406,7 +596,6 @@ const CalculatePCIScreen = ({ navigation }) => {
     const year1Num = parseInt(year1);
     const year2Num = parseInt(year2);
 
-    // Validate exact 2-year difference
     if (year2Num !== year1Num + 2) {
       Alert.alert(
         "Invalid Year Gap",
@@ -484,14 +673,12 @@ const CalculatePCIScreen = ({ navigation }) => {
     let csvContent = `Surveyor Name:,${userName}\n`;
     csvContent += `Survey Date:,${formattedDate}\n\n`;
 
-    // Create header row
     csvContent += `Road Name,PCI ${year2}`;
     results.years.forEach((year) => {
       csvContent += `,PCI ${year}`;
     });
     csvContent += "\n";
 
-    // Add data rows with PCI values and conditions
     results.roads.forEach((road) => {
       csvContent += `${road.name},${road.pci_year2}(${classifyPCI(
         road.pci_year2 * 20
@@ -527,15 +714,7 @@ const CalculatePCIScreen = ({ navigation }) => {
       ]}
     >
       <View style={styles.card}>
-        <Text
-          style={[
-            styles.cardTitle,
-            {
-              color: colors.accent,
-              borderRadius: 5,
-            },
-          ]}
-        >
+        <Text style={[styles.cardTitle, { color: colors.accent }]}>
           Enter Your Information
         </Text>
 
@@ -564,7 +743,7 @@ const CalculatePCIScreen = ({ navigation }) => {
           </TouchableOpacity>
           {showDatePicker && (
             <DateTimePicker
-              value={surveyDate || new Date()} // Fallback to current date if null
+              value={surveyDate || new Date()}
               mode="date"
               display="default"
               onChange={handleDateChange}
@@ -611,20 +790,7 @@ const CalculatePCIScreen = ({ navigation }) => {
       </View>
     </Animated.View>
   );
-  useEffect(() => {
-    if (year1 && year2) {
-      const year1Num = parseInt(year1);
-      const year2Num = parseInt(year2);
 
-      if (year2Num !== year1Num + 2) {
-        setYearError(`Year 2 must be ${year1Num + 2}`);
-      } else {
-        setYearError("");
-      }
-    } else {
-      setYearError("");
-    }
-  }, [year1, year2]);
   const renderInputScreen = () => (
     <Animated.ScrollView
       ref={inputScrollViewRef}
@@ -637,6 +803,7 @@ const CalculatePCIScreen = ({ navigation }) => {
       }}
       indicatorStyle="white"
       scrollIndicatorInsets={{ right: 1 }}
+      onScroll={handleScroll}
     >
       <View style={styles.paddedContent}>
         <View style={[styles.card, { marginTop: 10 }]}>
@@ -650,7 +817,9 @@ const CalculatePCIScreen = ({ navigation }) => {
           <View style={styles.formGroup}>
             <Text style={styles.label}>Upload Excel File:</Text>
             <Text style={styles.helperText}>
-              Required columns: roadname, pcivalue_{year1}, pcivalue_{year2}
+              Required columns: roadname, pci_{year1}, pci_{year2}
+              {"\n"}Column names can be in any order or format (e.g., "Road
+              Name", "PCI 2025", "pci_2027")
             </Text>
             <TouchableOpacity
               style={styles.excelButton}
@@ -774,18 +943,16 @@ const CalculatePCIScreen = ({ navigation }) => {
     if (!results) return null;
 
     const colorPalette = [
-      "#FF6384",
-      "#36A2EB",
-      "#FFCE56",
-      "#4BC0C0",
-      "#9966FF",
-      "#FF9F40",
-      "#8AC24A",
-      "#FF5733",
-      "#5D6D7E",
-      "#A569BD",
-      "#16A085",
-      "#E74C3C",
+      "#3498db", // Blue
+      "#e74c3c", // Red
+      "#2ecc71", // Green
+      "#f39c12", // Orange
+      "#9b59b6", // Purple
+      "#1abc9c", // Teal
+      "#d35400", // Pumpkin
+      "#34495e", // Dark blue
+      "#27ae60", // Dark green
+      "#c0392b", // Dark red
     ];
 
     const conditions = [
@@ -806,7 +973,6 @@ const CalculatePCIScreen = ({ navigation }) => {
       Failed: "#7f8c8d",
     };
 
-    // Prepare pie chart data for each year
     const pieCharts = results.years.map((year, index) => {
       const conditionCounts = {};
       const conditionRoads = {};
@@ -838,18 +1004,16 @@ const CalculatePCIScreen = ({ navigation }) => {
       };
     });
 
-    // Initialize pie chart refs
     pieChartRefs.current = Array(pieCharts.length)
       .fill()
       .map((_, i) => pieChartRefs.current[i] || React.createRef());
 
-    // Split roads into chunks for line charts
     const roadChunks = [];
     for (let i = 0; i < results.roads.length; i += MAX_ROADS_PER_CHART) {
       roadChunks.push(results.roads.slice(i, i + MAX_ROADS_PER_CHART));
     }
 
-    // Initialize line chart refs
+    // Initialize line chart refs if not already done
     lineChartRefs.current = Array(roadChunks.length)
       .fill()
       .map((_, i) => lineChartRefs.current[i] || React.createRef());
@@ -866,6 +1030,7 @@ const CalculatePCIScreen = ({ navigation }) => {
         }}
         indicatorStyle="white"
         scrollIndicatorInsets={{ right: 1 }}
+        onScroll={handleScroll}
       >
         <View style={styles.paddedContent}>
           <View style={styles.resultsSection}>
@@ -961,11 +1126,12 @@ const CalculatePCIScreen = ({ navigation }) => {
             </View>
 
             <View style={styles.chartsContainer}>
-              {/* Line Charts - Split into chunks */}
               {showLineCharts && (
                 <>
                   {roadChunks.map((chunk, chunkIndex) => {
                     const dataGroups = {};
+                    const roadNames = [];
+
                     chunk.forEach((road) => {
                       const dataKey = [
                         road.pci_year2 * 20,
@@ -987,6 +1153,7 @@ const CalculatePCIScreen = ({ navigation }) => {
                       } else {
                         dataGroups[dataKey].roads.push(road.name);
                       }
+                      roadNames.push(road.name);
                     });
 
                     const groupedData = Object.values(dataGroups);
@@ -995,83 +1162,49 @@ const CalculatePCIScreen = ({ navigation }) => {
                       labels: [year2, ...results.years],
                       datasets: groupedData.map((group, index) => ({
                         data: group.data,
-                        color: (opacity = 1) => {
-                          const hex = colorPalette[index % colorPalette.length];
-                          const r = parseInt(hex.slice(1, 3), 16);
-                          const g = parseInt(hex.slice(3, 5), 16);
-                          const b = parseInt(hex.slice(5, 7), 16);
-                          return `rgba(${r}, ${g}, ${b}, ${opacity})`;
-                        },
-                        strokeWidth: 5,
+                        color: () => colorPalette[index % colorPalette.length],
+                        strokeWidth: 3,
                       })),
-                      legend: [],
                     };
 
+                    const html = generateLineChartHTML(
+                      lineChartData,
+                      roadNames
+                    );
+
                     return (
-                      <View key={chunkIndex} style={styles.card}>
-                        <Text
-                          style={[styles.cardTitle, { color: colors.accent }]}
-                        >
-                          PCI Trend Over Years ({chunkIndex + 1}/
+                      <View key={chunkIndex} style={styles.chartCard}>
+                        <Text style={styles.chartTitle}>
+                          PCI Trend Projection ({chunkIndex + 1}/
                           {roadChunks.length})
                         </Text>
-                        <Text style={styles.chartSubtitle}>
-                          Showing roads {chunkIndex * MAX_ROADS_PER_CHART + 1}-
-                          {Math.min(
-                            (chunkIndex + 1) * MAX_ROADS_PER_CHART,
-                            results.roads.length
-                          )}
-                        </Text>
+
                         <ViewShot
                           ref={lineChartRefs.current[chunkIndex]}
-                          options={{ format: "jpg", quality: 0.9 }}
+                          options={{ format: "png", quality: 0.9 }}
                         >
-                          <View>
-                            <LineChart
-                              data={lineChartData}
-                              width={screenWidth - 80}
-                              height={320}
-                              chartConfig={{
-                                backgroundColor: colors.white,
-                                backgroundGradientFrom: colors.white,
-                                backgroundGradientTo: colors.white,
-                                decimalPlaces: 2,
-                                color: (opacity = 1) =>
-                                  `rgba(0, 0, 0, ${opacity})`,
-                                labelColor: (opacity = 1) =>
-                                  `rgba(0, 0, 0, ${opacity})`,
-                                style: { borderRadius: 16 },
-                                propsForDots: {
-                                  r: "8",
-                                  strokeWidth: "3",
-                                  stroke: "#ffffff",
-                                },
-                                propsForLabels: {
-                                  fontSize: 10,
-                                },
-                              }}
-                              bezier
-                              style={{
-                                marginVertical: 1,
-                                borderRadius: 16,
-                                paddingRight: 70,
-                              }}
-                              withVerticalLabels={true}
-                              withHorizontalLabels={true}
-                              fromZero={true}
-                              segments={4}
-                              xLabelsOffset={-10}
-                              yAxisSuffix=""
-                              yAxisInterval={1}
-                              withInnerLines={true}
-                              withOuterLines={true}
+                          <View style={styles.webviewContainer}>
+                            <WebView
+                              originWhitelist={["*"]}
+                              source={{ html }}
+                              style={styles.webview}
+                              scalesPageToFit={false}
+                              javaScriptEnabled={true}
+                              domStorageEnabled={true}
+                              startInLoadingState={true}
+                              renderLoading={() => (
+                                <View style={styles.loadingContainer}>
+                                  <ActivityIndicator
+                                    size="large"
+                                    color={colors.accent}
+                                  />
+                                </View>
+                              )}
+                              onLoadEnd={() => setWebViewLoaded(true)}
                             />
-                            <View style={styles.axisTitleContainer}>
-                              <Text style={styles.yAxisTitle}>PCI</Text>
-                              <Text style={styles.xAxisTitle}>Years</Text>
-                            </View>
                           </View>
                         </ViewShot>
+
                         <View style={styles.legendContainer}>
                           {groupedData.map((group, index) => (
                             <View key={index} style={styles.legendItem}>
@@ -1090,32 +1223,12 @@ const CalculatePCIScreen = ({ navigation }) => {
                             </View>
                           ))}
                         </View>
-                        <TouchableOpacity
-                          style={styles.downloadButton}
-                          onPress={() => {
-                            captureAndShareGraph(
-                              lineChartRefs.current[chunkIndex],
-                              `PCI Trend Chart ${chunkIndex + 1}`
-                            );
-                          }}
-                          activeOpacity={0.7}
-                        >
-                          <FontAwesome
-                            name="download"
-                            size={16}
-                            color="#f5b301"
-                          />
-                          <Text style={styles.downloadButtonText}>
-                            Download as Image
-                          </Text>
-                        </TouchableOpacity>
                       </View>
                     );
                   })}
                 </>
               )}
 
-              {/* Pie Charts for Each Year */}
               <View style={styles.card}>
                 <Text style={[styles.cardTitle, { color: colors.accent }]}>
                   Condition Distribution by Year
@@ -1347,7 +1460,73 @@ const CalculatePCIScreen = ({ navigation }) => {
           ? renderInputScreen()
           : renderResultsScreen()}
 
-        {/* Condition Details Modal */}
+        {(currentScreen === "input" || currentScreen === "results") && (
+          <>
+            {showScrollUpButton && (
+              <Animated.View
+                style={[
+                  styles.scrollUpButton,
+                  {
+                    opacity: scrollButtonOpacity,
+                    transform: [
+                      {
+                        translateY: scrollButtonOpacity.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [50, 0],
+                        }),
+                      },
+                    ],
+                    right: 30,
+                    bottom: 130,
+                  },
+                ]}
+              >
+                <TouchableOpacity
+                  onPress={scrollToTop}
+                  style={styles.scrollButtonContent}
+                  activeOpacity={0.7}
+                >
+                  <FontAwesome
+                    name="arrow-up"
+                    size={20}
+                    color={colors.accent}
+                  />
+                </TouchableOpacity>
+              </Animated.View>
+            )}
+
+            <Animated.View
+              style={[
+                styles.scrollDownButton,
+                {
+                  opacity: scrollButtonOpacity,
+                  transform: [
+                    {
+                      translateY: scrollButtonOpacity.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [50, 0],
+                      }),
+                    },
+                  ],
+                  right: 30,
+                },
+              ]}
+            >
+              <TouchableOpacity
+                onPress={scrollToBottom}
+                style={styles.scrollButtonContent}
+                activeOpacity={0.7}
+              >
+                <FontAwesome
+                  name="arrow-down"
+                  size={20}
+                  color={colors.accent}
+                />
+              </TouchableOpacity>
+            </Animated.View>
+          </>
+        )}
+
         <Modal
           visible={showConditionModal}
           animationType="fade"
@@ -1428,7 +1607,6 @@ const CalculatePCIScreen = ({ navigation }) => {
           </View>
         </Modal>
 
-        {/* Excel File Selection Loading Modal */}
         <Modal visible={excelSelectLoading} transparent>
           <View style={styles.loadingOverlay}>
             <View style={styles.loadingContent}>
@@ -1438,7 +1616,6 @@ const CalculatePCIScreen = ({ navigation }) => {
           </View>
         </Modal>
 
-        {/* Excel Processing Loading Modal */}
         <Modal visible={excelLoading} transparent>
           <View style={styles.loadingOverlay}>
             <View style={styles.loadingContent}>
@@ -1448,7 +1625,6 @@ const CalculatePCIScreen = ({ navigation }) => {
           </View>
         </Modal>
 
-        {/* Analysis Loading Modal */}
         <Modal visible={loading} transparent>
           <View style={styles.loadingOverlay}>
             <View style={styles.loadingContent}>
@@ -1528,11 +1704,6 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     textAlign: "center",
   },
-  cardText: {
-    fontSize: 14,
-    color: "#f8f9fa",
-    marginBottom: 15,
-  },
   formGroup: {
     marginBottom: 15,
   },
@@ -1543,18 +1714,12 @@ const styles = StyleSheet.create({
     color: "#f8f9fa",
   },
   input: {
-    backgroundColor: "#ffffff",
-    borderWidth: 2,
-    borderColor: "rgba(54, 63, 77, 1)",
-    borderRadius: 6,
+    backgroundColor: "rgba(23, 27, 33, 1)",
+    color: colors.textLight,
     padding: 12,
-    fontSize: 16,
-    color: "#1e2328",
-  },
-  spinnerContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
   },
   excelButton: {
     backgroundColor: "#21a366",
@@ -1708,9 +1873,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#3b3f46",
     borderRadius: 6,
     padding: 10,
-    flexDirection: "row",
-    justifyContent: "center",
     alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
     marginTop: 10,
     borderColor: colors.accent,
     borderWidth: 2,
@@ -1721,11 +1886,50 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "bold",
   },
+  chartCard: {
+    backgroundColor: "rgba(37, 42, 50, 0.9)",
+    borderRadius: 12,
+    padding: 15,
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  chartTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.accent,
+    marginBottom: 15,
+    textAlign: "center",
+  },
+  webviewContainer: {
+    width: screenWidth - 60,
+    height: 350,
+    backgroundColor: "#ffffff",
+    borderRadius: 8,
+    overflow: "hidden",
+    marginVertical: 10,
+  },
+  webview: {
+    flex: 1,
+    backgroundColor: "transparent",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#ffffff",
+  },
   legendContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "center",
-    marginTop: 10,
+    marginTop: 15,
+    marginBottom: 15,
+    alignItems: "flex-start",
+    paddingHorizontal: 15,
   },
   legendItem: {
     flexDirection: "row",
@@ -1740,7 +1944,7 @@ const styles = StyleSheet.create({
     marginRight: 5,
   },
   legendText: {
-    color: "#f8f9fa",
+    color: colors.textLight,
     fontSize: 12,
   },
   pieChartContainer: {
@@ -1781,12 +1985,6 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontSize: 14,
     fontWeight: "bold",
-  },
-  chartSubtitle: {
-    textAlign: "center",
-    marginBottom: 10,
-    color: "#f8f9fa",
-    fontStyle: "italic",
   },
   modalOverlay: {
     flex: 1,
@@ -1856,29 +2054,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
   },
-  axisTitleContainer: {
-    position: "absolute",
-    width: "100%",
-    height: "100%",
-    pointerEvents: "none",
-  },
-  yAxisTitle: {
-    position: "absolute",
-    left: 5,
-    top: "45%",
-    transform: [{ rotate: "-90deg" }],
-    fontSize: 12,
-    fontWeight: "bold",
-    color: "#1e2328",
-  },
-  xAxisTitle: {
-    position: "absolute",
-    bottom: 15,
-    left: "45%",
-    fontSize: 12,
-    fontWeight: "bold",
-    color: "#1e2328",
-  },
   scrollView: {
     flex: 1,
   },
@@ -1891,25 +2066,72 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   dateInput: {
-    backgroundColor: "#ffffff",
-    borderWidth: 2,
-    borderColor: "rgba(54, 63, 77, 1)",
-    borderRadius: 6,
+    backgroundColor: "rgba(23, 27, 33, 1)",
     padding: 12,
-    justifyContent: "center",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
   },
   dateText: {
     fontSize: 16,
-    color: "#1e2328",
+    color: colors.textLight,
   },
   placeholderText: {
     fontSize: 16,
-    color: "#999", // Gray color for placeholder
+    color: "#999",
   },
   errorText: {
     color: "#ff4444",
     fontSize: 14,
     marginTop: 5,
+  },
+  scrollUpButton: {
+    position: "absolute",
+    right: 20,
+    bottom: 110,
+    backgroundColor: "rgba(59, 63, 70, 0.9)",
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: colors.accent,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  scrollDownButton: {
+    position: "absolute",
+    right: 20,
+    bottom: 70,
+    backgroundColor: "rgba(59, 63, 70, 0.9)",
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: colors.accent,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  scrollButtonContent: {
+    width: "100%",
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
   },
 });
 
